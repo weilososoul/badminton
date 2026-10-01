@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🏸 羽毛球計數器</title>
+<style>
+  :root{
+    --teal:#0d9488; --teal-dark:#0f766e; --ink:#1f2937; --muted:#6b7280;
+    --bg:#eef4f2; --card:#ffffff; --line:#e5e7eb; --warn-bg:#fef3c7; --warn-line:#f59e0b;
+    --ok:#059669; --bad:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","PingFang HK","Microsoft JhengHei","Noto Sans TC",sans-serif;
+    line-height:1.55; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:780px;margin:0 auto;padding:16px 14px 60px}
+  header{padding:18px 4px 6px}
+  header h1{margin:0;font-size:1.5em;letter-spacing:.5px}
+  header p{margin:2px 0 0;color:var(--muted);font-size:.95em}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:14px;margin-top:14px}
+  label{display:block;font-size:.9em;color:var(--muted);margin:10px 0 4px}
+  textarea{
+    width:100%;min-height:200px;padding:10px;border:1px solid var(--line);border-radius:10px;
+    font:inherit;font-size:.95em;resize:vertical;background:#fafafa;
+  }
+  textarea:focus,input:focus,select:focus{outline:2px solid rgba(13,148,136,.35);border-color:var(--teal)}
+  input[type=text],input[type=password],input[type=number]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:130px}
+  button{
+    font:inherit;border:none;border-radius:10px;padding:10px 18px;cursor:pointer;font-weight:600;
+    background:#e5e7eb;color:var(--ink);transition:filter .15s;
+  }
+  button:hover{filter:brightness(.95)}
+  .btn-primary{background:var(--teal);color:#fff}
+  .btn-ai{background:#7c3aed;color:#fff}
+  .btn-sm{padding:6px 12px;font-size:.9em;border-radius:8px}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  details{margin-top:10px}
+  summary{cursor:pointer;color:var(--teal-dark);font-weight:600;font-size:.95em}
+  .hint{color:var(--muted);font-size:.85em;margin-top:4px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.8em;font-weight:600}
+  .badge-rule{background:#ccfbf1;color:var(--teal-dark)}
+  .badge-ai{background:#ede9fe;color:#6d28d9}
+  .badge-rec{background:#fef3c7;color:#92400e}
+  .histRow:hover{background:#f0fdf9}
+  .paidChk{width:18px;height:18px;cursor:pointer;accent-color:var(--teal)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px}
+  .stat{background:#f0fdf9;border:1px solid #99f6e4;border-radius:12px;padding:10px 12px}
+  .stat .k{font-size:.8em;color:var(--muted)}
+  .stat .v{font-size:1.25em;font-weight:700;color:var(--teal-dark)}
+  .tablewrap{overflow-x:auto;margin-top:8px}
+  table{border-collapse:collapse;width:100%;font-size:.92em}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  th{background:#f0fdf9;color:var(--teal-dark);font-size:.85em}
+  .feeInput{width:80px;padding:3px 6px;border:1px dashed #f59e0b;border-radius:6px;font:inherit;font-size:.92em;text-align:right;background:#fffbeb;color:#92400e}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pos{color:var(--ok);font-weight:700}
+  .neg{color:var(--bad);font-weight:700}
+  .zero{color:var(--muted)}
+  .warnbox{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.9em}
+  .warnbox ul{margin:4px 0 2px;padding-left:20px}
+  .balance{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:12px;padding:12px;margin-top:14px;font-size:.95em}
+  .balance b.big{font-size:1.15em}
+  h3{margin:16px 0 2px;font-size:1.05em}
+  h3 .sub{font-weight:400;color:var(--muted);font-size:.85em}
+  .howto{font-size:.88em;color:#374151}
+  .howto li{margin:3px 0}
+  .wa{width:100%;min-height:110px;font-size:.85em;font-family:inherit}
+  #result{display:none}
+  .ok-note{color:var(--muted);font-size:.85em;margin-top:6px}
+  @media (max-width:480px){ .stat .v{font-size:1.05em} table{font-size:.85em} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏸 羽毛球計數器</h1>
+    <p>貼個清單落去，自動計出每人應付 / 應收。</p>
+  </header>
+
+  <div class="card">
+    <label for="input">清單（照抄 WhatsApp 個 format 貼落嚟）</label>
+    <textarea id="input" placeholder="日期：17/9/2026 (四）
+地點：上水龍琛體育館
+時間場地：
+H 5-6#6
+-------------------
+1.Red (6-9)
+2.Kitty (7-10）
+..."></textarea>
+    <div class="btnrow">
+      <button class="btn-primary" id="btnCalc">🧮 計數</button>
+      <button id="btnSample">載入示例</button>
+      <button id="btnAI" class="btn-ai" style="display:none">🤖 用 AI 重新解析</button>
+      <button id="btnClear">清空</button>
+    </div>
+
+    <details>
+      <summary>⚙️ 價錢同其他設定</summary>
+      <div class="row">
+        <div>
+          <label for="courtFee">場租（每場每鐘 $）</label>
+          <input type="number" id="courtFee" min="0" step="0.5" value="59">
+        </div>
+        <div>
+          <label for="shuttleFee">波錢（每人每鐘 $，只計普通場嘅鐘）</label>
+          <input type="number" id="shuttleFee" min="0" step="0.5" value="15">
+        </div>
+        <div>
+          <label for="shuttlePayer">波錢由邊個墊支（預設：Cathy）</label>
+          <input type="text" id="shuttlePayer" list="nameOptions" placeholder="留空 = 未指明" value="Cathy">
+          <datalist id="nameOptions"></datalist>
+        </div>
+      </div>
+      <details style="margin-top:12px">
+        <summary>🤖 AI 設定（格式亂咗先需要，可唔填）</summary>
+        <div class="row">
+          <div>
+            <label for="aiBase">API Base URL（OpenAI 相容）</label>
+            <input type="text" id="aiBase" placeholder="https://open.bigmodel.cn/api/paas/v4">
+          </div>
+          <div>
+            <label for="aiModel">模型名稱</label>
+            <input type="text" id="aiModel" placeholder="glm-4.6 / glm-4-flash / gpt-4o-mini">
+          </div>
+        </div>
+        <label for="aiKey">API Key</label>
+        <input type="password" id="aiKey" placeholder="只會存喺你部機嘅瀏覽器（localStorage）">
+        <p class="hint">規則解析唔到嗰陣，可以撳「用 AI 重新解析」叫 AI 幫手讀清單（淨係解析，計數照舊喺本機做）。部分服務瀏覽器直連可能會 CORS 錯，咁就要用第二個供應商或者代理。</p>
+      </details>
+    </details>
+
+    <details style="margin-top:8px">
+      <summary>📖 點計（睇下條數點嚟）</summary>
+      <ul class="howto">
+        <li>場租 = 每個 book 場嘅費用加埋（普通場每鐘 $59；特別價場照價，已包埋波錢）</li>
+        <li>場租部份按每人打嘅鐘數分攤（四捨五入至 $0.1，夾埋啱啱等於場租總額）</li>
+        <li>波錢 = 每人每鐘 $15，只計「普通場開緊」嘅鐘（特別價場嗰啲鐘已包，唔使計）</li>
+        <li>每人應付 = 場租份 + 自己波錢</li>
+        <li>Book 場嘅人有墊支，應收返墊咗嘅數；你收齊所有人嘅錢，再找返俾佢哋</li>
+        <li>某個場有特別價？喺「場地明細」改嗰格，或者喺清單行尾加「 $360」。特別價 = 嗰個場嘅總數（已包埋波錢），唔會再另加波錢</li>
+        <li>可以一次過貼幾個清單（例如兩三個禮拜嘅數一齊結）：下一份以「日期：」開頭會自動分開，或者中間加一行「=====」，各人條數會合併出總數</li>
+        <li>簡單格式都認得：「1/10」淨一行當日期；「時間：10-1 (俊1→賢2→Cathy3)」= 10點至1點、邊個 book 咗邊個鐘；下面淨係名冇時間（1.俊）= 個個當打足成個 session</li>
+        <li>「搞掂 ✓」欄勾一勾 = 記住邊個已俾錢／你已找返錢；記錄表會顯示「已收 x/y」，收齊變「✅ 收齊」</li>
+        <li>「跟X」= 跟 X 嘅打波時間（以打波名單嘅時間為準，唔係佢 book 場嘅時間）</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="card" id="result">
+    <div id="badge"></div>
+    <div id="issues"></div>
+    <h3>總覽 <span class="sub" id="metaLine"></span></h3>
+    <div class="cards" id="cards"></div>
+
+    <h3>場地明細 <span class="sub">（黃色格可以改成特別價 = 嗰個場嘅總數，包埋波錢，唔會再另加；亦可以喺清單嗰行尾加「 $360」）</span></h3>
+    <div class="tablewrap"><table id="bookTable"></table></div>
+
+    <h3>每人明細 <span class="sub">（淨數 = 應收返墊支 − 應付；負數即係要俾你）</span></h3>
+    <div class="tablewrap"><table id="peopleTable"></table></div>
+
+    <div class="balance" id="balanceBox"></div>
+
+    <h3>📤 出數去群組</h3>
+    <div class="btnrow" style="margin-top:4px">
+      <button class="btn-primary btn-sm" id="btnCopy">📋 複製 WhatsApp 摘要</button>
+    </div>
+    <textarea class="wa" id="waPreview" readonly></textarea>
+    <p class="ok-note" id="copyNote"></p>
+  </div>
+
+  <div class="card" id="historyCard">
+    <h3>📜 記錄 <span class="sub">（計過嘅數自動存喺呢部裝置；撳一行睇返明細）</span></h3>
+    <div class="btnrow" style="margin-top:6px">
+      <button class="btn-sm" id="btnExport">📦 匯出備份</button>
+      <button class="btn-sm" id="btnImport">📥 匯入備份</button>
+      <button class="btn-sm" id="btnClearHist">🗑️ 清空</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+    </div>
+    <div class="tablewrap"><table id="histTable"></table></div>
+    <p class="hint">「↺ 載入」= 攞返個清單入去改。記錄只存喺呢部機嘅瀏覽器 —— 換機／清 cache 之前記得匯出備份。</p>
+  </div>
+</div>
+
+<noscript>呢個工具需要開 JavaScript 先用到。</noscript>
+
+<script>
+'use strict';
+/* ===================== 純邏輯（同 UI 分開，方便測試） ===================== */
+
+function normLine(s){
+  return String(s)
+    .replace(/\uFF08/g,'(').replace(/\uFF09/g,')')
+    .replace(/\uFF1A/g,':').replace(/\uFF0C/g,',')
+    .replace(/\uFF0F/g,'/').replace(/\uFF03/g,'#').replace(/\uFF0D/g,'-').replace(/\uFF1D/g,'=')
+    .replace(/[\u3000\u00A0]/g,' ')
+    .replace(/[\u2013\u2014\u2212\uFF5E]/g,'-')
+    .replace(/[０-９]/g, d => '０１２３４５６７８９'.indexOf(d))
+    .replace(/\uFEFF/g,'')
+    .trim();
+}
+
+function isDivider(line){
+  const t = line.replace(/[\s\u622A\u5B8C\u7D50endEND]/g, '');
+  return t.length >= 3 && /^[-_~*]+$/.test(t);
+}
+
+const BOOK_RE = /^(.+?)\s*(\d{1,2})\s*-\s*(\d{1,2})\s*#\s*(.+)$/;
+
+function parseList(raw){
+  const issues = [];
+  const all = String(raw).split(/\r?\n/);
+  const entries = [];
+  all.forEach((t0, idx) => { const t = normLine(t0); if (t !== '') entries.push({ text: t, idx }); });
+  const lines = entries.map(e => e.text);
+  const divIdx = lines.map((l, i) => isDivider(l) ? i : -1).filter(i => i >= 0);
+
+  let headEntries, playerLines;
+  if (divIdx.length === 0){
+    headEntries = entries; playerLines = [];
+  } else {
+    headEntries = entries.slice(0, divIdx[0]);
+    playerLines = lines.slice(divIdx[0] + 1, divIdx.length > 1 ? divIdx[1] : lines.length);
+  }
+
+  let date = '', venue = '', session = null;
+  const bookings = [];
+  for (const e of headEntries){
+    const l = e.text;
+    let m = l.match(/^日期\s*[:：]?\s*(.*)$/);
+    if (m){ date = m[1].trim(); continue; }
+    m = l.match(/^地點\s*[:：]?\s*(.*)$/);
+    if (m){ venue = m[1].trim(); continue; }
+    if (/^時間場地/.test(l) && !/\d/.test(l)) continue;
+    // 簡單格式：「時間：10-1 (俊1->賢2->Cathy3)」= session 時間 + 邊個 book 咗邊個鐘
+    const sm = l.match(/^時間(?:場地)?\s*[:：]?\s*(\d{1,2})\s*-\s*(\d{1,2})\s*(?:\(\s*([^)]*)\s*\))?/);
+    if (sm){
+      let sh = +sm[1], eh = +sm[2];
+      while (eh <= sh) eh += 12; // 「10-1」= 10點至下晝1點
+      session = { start: sh, end: eh };
+      if (sm[3]){
+        const toks = sm[3].split(/->|→|,|，|、|>|;|；/).map(x => x.trim()).filter(Boolean);
+        toks.forEach((tk, idx) => {
+          const tk2 = tk.match(/^(.+?)(\d{1,2})$/);
+          const bname = (tk2 ? tk2[1] : tk).trim();
+          if (!bname) return;
+          const slot = tk2 ? +tk2[2] : (idx + 1);
+          const bs = sh + slot - 1;
+          if (bs >= sh && bs < eh){
+            bookings.push({ name: bname, start: bs, end: bs + 1, hours: 1, court: '第' + slot + '鐘', priceOverride: null, srcLine: e.idx });
+          } else {
+            issues.push({level:'warn', msg:`「時間」嗰度嘅「${tk}」對唔返個時段，忽略咗。`});
+          }
+        });
+      }
+      continue;
+    }
+    // 淨一行日期：「1/10」
+    if (!date){
+      const dm = l.match(/^(\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)$/);
+      if (dm){ date = dm[1]; continue; }
+    }
+    // 特別價：行內有 $XXX 就當成呢個 book 場嘅總數、包埋波錢（例如「禮 8-10#6轉3 $360」）
+    let priceOverride = null, body = l;
+    const pm = l.match(/[$＄]\s*(\d+(?:\.\d+)?)/);
+    if (pm){
+      priceOverride = parseFloat(pm[1]);
+      body = (l.slice(0, pm.index) + ' ' + l.slice(pm.index + pm[0].length)).replace(/\s{2,}/g, ' ').trim();
+    }
+    m = body.match(BOOK_RE);
+    if (m){
+      const start = +m[2], end = +m[3];
+      const name = m[1].replace(/[:：]\s*$/, '').trim();
+      if (end <= start){ issues.push({level:'warn', msg:`「${l}」個時間 ${start}-${end} 唔合理，跳過咗。`}); continue; }
+      bookings.push({ name, start, end, hours: end - start, court: m[4].trim(), priceOverride, srcLine: e.idx });
+      continue;
+    }
+    if (l.trim() !== '' && divIdx.length > 0) issues.push({level:'warn', msg:`場地嗰度認唔出行：「${l}」`});
+  }
+
+  const players = [];
+  const stripNo = s => {
+    const t = s.replace(/^\s*\d+\s*(?:[.、:：)）]\s*|\s+)/, '').trim();
+    return t || s.trim();
+  };
+  const pushSpec = (rawName, spec, from) => {
+    const name = stripNo(rawName);
+    spec = spec.trim().replace(/\s*(?:hrs?|小時|個鐘|个钟)\s*$/i, '');
+    if (!/\S/.test(name)){ issues.push({level:'warn', msg:`打波名單認唔出行：「${from}」`}); return; }
+    const fm = spec.match(/^(?:跟|跟住|跟隨)\s*(.+)$/);
+    if (fm){
+      players.push({ name, follow: fm[1].trim() });
+      return;
+    }
+    const tm = spec.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+    if (tm && (+tm[2]) > (+tm[1])){
+      players.push({ name, start: +tm[1], end: +tm[2] });
+    } else {
+      issues.push({level:'warn', msg:`「${name}」嘅時間「${spec}」認唔到，已跳過，記得手動補返。`});
+    }
+  };
+  for (const l of playerLines){
+    if (isDivider(l)) continue;
+    let m = l.match(/^(.+?)\s*\(\s*([^()]*)\s*\)\s*$/);
+    if (m){ pushSpec(m[1], m[2], l); continue; }
+    // 冇括號都試下：「15. Ivan 6-9」、「15. 賢 跟H」
+    const nm = l.match(/^(.+?)\s+(\d{1,2})\s*-\s*(\d{1,2})\s*(?:hrs?|小時|個鐘|个钟)?$/i);
+    if (nm){ pushSpec(nm[1], nm[2] + '-' + nm[3], l); continue; }
+    const fm2 = l.match(/^(.+?)\s+跟\s*(\S+)$/);
+    if (fm2){ pushSpec(fm2[1], '跟' + fm2[2], l); continue; }
+    // 齋名冇時間（1.俊）→ 當打足成個 session
+    const bn = l.match(/^\s*\d+\s*[.、:：)）]\s*(.+?)\s*$/);
+    if (bn && session && !/[()#]/.test(bn[1]) && !/\d\s*-\s*\d/.test(bn[1])){
+      players.push({ name: bn[1].trim(), start: session.start, end: session.end });
+      continue;
+    }
+    issues.push({level:'warn', msg:`打波名單認唔出行：「${l}」`});
+  }
+
+  // 冇分隔線嘅後備：逐行憑格式分（簡單格式主要靠呢條路）
+  if (divIdx.length === 0){
+    const bareDate = t => /^\d{1,2}[-/]\d{1,2}([-/]\d{2,4})?$/.test(t);
+    for (const l of lines){
+      if (isDivider(l)) continue;
+      if (/^(日期|date|地點|venue)\s*[:：]/i.test(l) || /^時間/.test(l) || bareDate(l)) continue;
+      if (BOOK_RE.test(l)) continue; // 已經喺頭部當咗 booking
+      let m = l.match(/^(.+?)\s*\(\s*([^()]*)\s*\)\s*$/);
+      if (m){ pushSpec(m[1], m[2], l); continue; }
+      const nm = l.match(/^(.+?)\s+(\d{1,2})\s*-\s*(\d{1,2})\s*(?:hrs?|小時|個鐘|个钟)?$/i);
+      if (nm){ pushSpec(nm[1], nm[2] + '-' + nm[3], l); continue; }
+      const fm2 = l.match(/^(.+?)\s+跟\s*(\S+)$/);
+      if (fm2){ pushSpec(fm2[1], '跟' + fm2[2], l); continue; }
+      const bn = l.match(/^\s*\d+\s*[.、:：)）]\s*(.+?)\s*$/);
+      if (bn && session && !/[()#]/.test(bn[1]) && !/\d\s*-\s*\d/.test(bn[1])){
+        players.push({ name: bn[1].trim(), start: session.start, end: session.end });
+        continue;
+      }
+      // 唔係玩家就靜靜哋跳過（可能係備註）
+    }
+  }
+
+  resolveFollows(players, bookings, issues);
+
+  // 同名重複 → 合併鐘數
+  const merged = [];
+  const seen = new Map();
+  for (const p of players){
+    if (p.start == null) continue;
+    if (seen.has(p.name)){
+      seen.get(p.name).hours += (p.end - p.start);
+      issues.push({level:'warn', msg:`「${p.name}」喺名單出現多過一次，鐘數已加埋一齊。`});
+    } else {
+      const q = { name: p.name, start: p.start, end: p.end, hours: p.end - p.start };
+      seen.set(p.name, q); merged.push(q);
+    }
+  }
+
+  if (divIdx.length === 0 && (bookings.length === 0 || merged.length === 0))
+    issues.push({level:'warn', msg:'搵唔到分隔線（---）同埋認唔齊資料 —— 試下喺 book 場同人員之間加一行「---」，或者照「📖 點計」入面嘅格式。'});
+  if (bookings.length === 0) issues.push({level:'error', msg:'認唔到任何 book 場資料（要有「名 時間#場號」呢啲行）。'});
+  if (merged.length === 0) issues.push({level:'error', msg:'認唔到任何打波的人員名單。'});
+
+  return { date, venue, bookings, players: merged, issues };
+}
+
+function resolveFollows(players, bookings, issues){
+  const byName = new Map(players.map(p => [p.name, p]));
+  for (const p of players){
+    if (!('follow' in p)) continue;
+    let cur = p, hops = 0;
+    const seen = new Set([p.name]);
+    while (cur.follow){
+      const t = byName.get(cur.follow);
+      if (!t || seen.has(t.name) || hops > 10) break;
+      seen.add(t.name); cur = t; hops++;
+    }
+    if (cur && !cur.follow && cur.start != null){
+      p.start = cur.start; p.end = cur.end;
+    } else {
+      const b = bookings.find(x => x.name === (cur.follow || p.follow));
+      if (b){
+        p.start = b.start; p.end = b.end;
+        issues.push({level:'warn', msg:`「${p.name}」跟「${b.name}」，但打波名單搵唔到佢，暫時用咗佢 book 場嘅時間 ${b.start}-${b.end}，請確認。`});
+      } else {
+        issues.push({level:'error', msg:`「${p.name}」想跟「${p.follow}」，但搵唔到呢個人，計唔到佢個數。`});
+      }
+    }
+    delete p.follow;
+  }
+}
+
+function fmtMoney(n){
+  const v = Math.round(n * 10) / 10;
+  return '$' + v.toFixed(1).replace(/\.0$/, '');
+}
+
+function compute(parsed, prices, shuttlePayer){
+  const COURT = prices.court, SHUTTLE = prices.shuttle;
+  const issues = parsed.issues.slice();
+  const bookings = parsed.bookings.map(b => Object.assign({}, b, {
+    courtFee: (b.priceOverride != null ? b.priceOverride : b.hours * COURT),
+    overridden: b.priceOverride != null,
+  }));
+
+  const courtHours = bookings.reduce((a, b) => a + b.hours, 0);
+  const courtFee = bookings.reduce((a, b) => a + b.courtFee, 0);
+  // 波錢窗口：普通場（冇特別價）開緊嘅鐘，先至要計波錢；特別價場包埋波錢
+  const shuttleWindow = new Set();
+  for (const b of bookings){
+    if (b.priceOverride != null) continue;
+    for (let h = Math.floor(b.start); h < b.end; h++) shuttleWindow.add(h);
+  }
+
+  const people = new Map();
+  const get = n => {
+    if (!people.has(n)) people.set(n, { name: n, hours: 0, share: 0, fronted: 0, played: false, timeLabel: '', shuttleHours: 0, shuttleFee: 0 });
+    return people.get(n);
+  };
+  for (const p of parsed.players){
+    const q = get(p.name);
+    q.hours += p.hours; q.played = true;
+    q.start = p.start; q.end = p.end;
+    q.timeLabel = q.timeLabel ? q.timeLabel + '+' : `${p.start}-${p.end}`;
+  }
+  // 每人波錢：每鐘 $SHUTTLE × 佢打嘅鐘入面有幾多個鐘係普通場開緊（特別價場包埋波錢，唔計）
+  let shuttlePH = 0;
+  for (const p of people.values()){
+    p.shuttleHours = 0; p.shuttleFee = 0;
+    if (!p.played) continue;
+    for (let h = Math.floor(p.start); h < p.end; h++) if (shuttleWindow.has(h)) p.shuttleHours++;
+    p.shuttleFee = p.shuttleHours * SHUTTLE;
+    shuttlePH += p.shuttleHours;
+  }
+  const shuttleFee = [...people.values()].reduce((a, p) => a + p.shuttleFee, 0);
+  const bookerTotal = new Map();
+  for (const b of bookings){
+    bookerTotal.set(b.name, (bookerTotal.get(b.name) || 0) + b.courtFee);
+  }
+  for (const [n, f] of bookerTotal) get(n).fronted += f;
+  for (const b of bookings){
+    if (!people.get(b.name).played)
+      issues.push({level:'info', msg:`「${b.name}」book 咗場但打波名單冇佢個名 —— 當佢淨係墊支收錢，冇打波份。`});
+  }
+  let shuttleUnassigned = 0;
+  const sp = (shuttlePayer || '').trim();
+  if (sp){
+    get(sp).fronted += shuttleFee;
+  } else if (shuttleFee > 0){
+    shuttleUnassigned = shuttleFee;
+  }
+
+  // 墊支加晒之後先齊人（包括淨係 book 場、冇打波嗰啲）
+  const everyone = [...people.values()];
+  const totalFee = courtFee + shuttleFee;
+  const totalPH = everyone.reduce((a, p) => a + p.hours, 0);
+  if (totalPH <= 0) return { error: '總人頭鐘數係 0，計唔到。' };
+
+  // 場租按人頭鐘分攤（最大餘數法夾到啱啱等於場租總額）；波錢每人自己計
+  const courtRate = courtFee / totalPH;
+  const T = Math.round(courtFee * 10);
+  const rawTenths = everyone.map(p => p.hours * courtRate * 10);
+  const floors = rawTenths.map(Math.floor);
+  let rem = T - floors.reduce((a, b) => a + b, 0);
+  const order = rawTenths.map((r, i) => [r - floors[i], i]).sort((a, b) => b[0] - a[0]);
+  everyone.forEach((p, i) => { p.share = floors[i] / 10; });
+  for (let k = 0; k < rem && k < order.length; k++) everyone[order[k][1]].share += 0.1;
+  for (const p of everyone) p.share = Math.round((p.share + p.shuttleFee) * 10) / 10;
+
+  for (const p of everyone) p.net = Math.round((p.fronted - p.share) * 10) / 10;
+
+  const collect = everyone.filter(p => p.net < 0).reduce((a, p) => a - p.net, 0);
+  const payBack = everyone.filter(p => p.net > 0).reduce((a, p) => a + p.net, 0);
+
+  everyone.sort((a, b) => a.net - b.net);
+
+  return {
+    bookings, everyone, issues,
+    totals: { courtHours, courtFee, shuttlePH, shuttleFee, totalFee, totalPH, courtRate },
+    balance: { collect, payBack, shuttleUnassigned },
+    meta: { date: parsed.date, venue: parsed.venue, shuttlePayer: sp || null },
+  };
+}
+
+function buildWhatsAppText(r){
+  const t = r.totals, L = [];
+  const head = [r.meta.date, r.meta.venue].filter(Boolean).join('｜');
+  L.push('🏸【羽毛球數】' + head);
+  L.push(`場租 ${fmtMoney(t.courtFee)}（${t.courtHours} 場鐘，按打波鐘數分）`);
+  L.push(`波錢 ${fmtMoney(t.shuttleFee)}（每人每鐘計，共 ${t.shuttlePH} 個計波鐘）`);
+  L.push(`合共 ${fmtMoney(t.totalFee)}｜總共 ${t.totalPH} 個打波人頭鐘`);
+  if (r.lists > 1) L.push(`（${r.lists} 個清單一齊夾埋計）`);
+  const owe = r.everyone.filter(p => p.net < -0.001);
+  const back = r.everyone.filter(p => p.net > 0.001);
+  if (owe.length){
+    L.push('————————————');
+    L.push('👤 各位應付：');
+    for (const p of owe) L.push(`${p.name}（打${p.hours}hr·波${p.shuttleHours}hr）${fmtMoney(-p.net)}`);
+  }
+  if (back.length){
+    L.push('————————————');
+    L.push('💰 我會找返：');
+    for (const p of back) L.push(`${p.name} ${fmtMoney(p.net)}`);
+  }
+  if (r.balance.shuttleUnassigned > 0){
+    L.push('————————————');
+    L.push(`ℹ️ 波錢 ${fmtMoney(r.balance.shuttleUnassigned)} 未指明邊個墊支，我收齊後再同買波嗰位對返。`);
+  } else if (r.meta.shuttlePayer){
+    L.push('————————————');
+    L.push(`ℹ️ 波錢 ${fmtMoney(t.shuttleFee)} 由 ${r.meta.shuttlePayer} 墊支，已計埋喺條數度。`);
+  }
+  return L.join('\n');
+}
+
+/* ===================== 多清單一齊計 ===================== */
+
+// 將成舊 text 判開做幾個清單：一行「====」=明確分隔；或者新嘅「日期：」行喺有內容之後出現 = 新清單
+function splitLists(raw){
+  const lines = String(raw).split(/\r?\n/);
+  const segs = [];
+  let cur = [], curStart = 0, hasContent = false;
+  const isHeaderLine = t => /^(日期|date|地點|venue|時間場地)\s*[:：]/i.test(t);
+  lines.forEach((ln, i) => {
+    const t = normLine(ln);
+    if (/^={3,}$/.test(t)){
+      if (cur.some(x => normLine(x).trim() !== '')) segs.push({ lines: cur, lineOffset: curStart });
+      cur = []; curStart = i + 1; hasContent = false;
+      return;
+    }
+    const isDateStart = /^(日期|date)\s*[:：]/i.test(t) || /^\d{1,2}[-/]\d{1,2}([-/]\d{2,4})?$/.test(t);
+    if (isDateStart && hasContent){
+      segs.push({ lines: cur, lineOffset: curStart });
+      cur = []; curStart = i; hasContent = false;
+    }    if (t !== '' && !isHeaderLine(t)) hasContent = true;
+    cur.push(ln);
+  });
+  if (cur.some(x => normLine(x).trim() !== '')) segs.push({ lines: cur, lineOffset: curStart });
+  return segs.map(s => ({ text: s.lines.join('\n'), lineOffset: s.lineOffset }));
+}
+
+function parseMulti(raw){
+  return splitLists(raw).map(s => {
+    const p = parseList(s.text);
+    for (const b of p.bookings) if (b.srcLine != null) b.srcLine += s.lineOffset;
+    return p;
+  });
+}
+
+function computeMultiParsed(parsedSegs, prices, shuttlePayer){
+  const results = parsedSegs.map(p => compute(p, prices, shuttlePayer));
+  const bad = results.filter(r => r.error);
+  if (bad.length) return { error: '有 ' + bad.length + ' 個清單計唔到，睇下係咪有份清單格式唔啱。' };
+  if (results.length === 1) return Object.assign(results[0], { lists: 1 });
+
+  const people = new Map();
+  const get = n => {
+    if (!people.has(n)) people.set(n, { name: n, hours: 0, shuttleHours: 0, share: 0, fronted: 0, played: false, timeLabel: '', sessions: 0 });
+    return people.get(n);
+  };
+  for (const p of parsedSegs){
+    for (const pl of p.players){
+      const q = get(pl.name);
+      q.hours += pl.hours; q.played = true; q.sessions++;
+      q.timeLabel = q.timeLabel ? q.timeLabel + '+' : `${pl.start}-${pl.end}`;
+    }
+  }
+  results.forEach(r => r.everyone.forEach(x => {
+    const q = get(x.name);
+    q.share += x.share; q.fronted += x.fronted;
+    q.shuttleHours += (x.shuttleHours || 0);
+    if (x.played) q.played = true;
+  }));
+  const everyone = [...people.values()];
+  for (const p of everyone){
+    p.net = Math.round((p.fronted - p.share) * 10) / 10;
+    if (p.sessions > 1) p.timeLabel = p.sessions + '堂';
+  }
+  const collect = everyone.filter(p => p.net < 0).reduce((a, p) => a - p.net, 0);
+  const payBack = everyone.filter(p => p.net > 0).reduce((a, p) => a + p.net, 0);
+  everyone.sort((a, b) => a.net - b.net);
+
+  const bookings = [];
+  results.forEach((r, i) => r.bookings.forEach(b => { b.seg = i + 1; bookings.push(b); }));
+  const issues = [{ level: 'info', msg: `今次一次過計咗 ${results.length} 個清單（${parsedSegs.map((p, i) => p.date || ('#' + (i + 1))).join('、')}），各人條數已合併。` }];
+  results.forEach((r, i) => r.issues.forEach(x => issues.push({ level: x.level, msg: `【清單${i + 1}】${x.msg}` })));
+
+  const sum = k => results.reduce((a, r) => a + r.totals[k], 0);
+  return {
+    bookings, everyone, issues, lists: results.length,
+    totals: {
+      courtHours: sum('courtHours'), courtFee: sum('courtFee'),
+      shuttlePH: sum('shuttlePH'), shuttleFee: sum('shuttleFee'),
+      totalFee: sum('totalFee'), totalPH: sum('totalPH'),
+      courtRate: sum('courtFee') / Math.max(1, sum('totalPH')),
+    },
+    balance: {
+      collect, payBack,
+      shuttleUnassigned: (shuttlePayer && String(shuttlePayer).trim()) ? 0 : sum('shuttleFee'),
+    },
+    meta: {
+      date: parsedSegs.map(p => p.date).filter(Boolean).join('、'),
+      venue: [...new Set(parsedSegs.map(p => p.venue).filter(Boolean))].join('、'),
+      shuttlePayer: results[0].meta.shuttlePayer,
+    },
+  };
+}
+
+/* ===================== AI 解析（後備） ===================== */
+
+const AI_SYS_PROMPT = '你係羽毛球聚會清單解析器。將用家貼上嘅清單解析成JSON，格式：'
+  + '{"date":"","venue":"","bookings":[{"name":"","start":5,"end":6,"court":"6","note":"4轉8","price":null}],'
+  + '"players":[{"name":"","start":6,"end":9,"follow":null}]} '
+  + '規則：分隔線（---）上面係場地資料，每行係「名字 開始-結束#場號」，場號有「轉」就寫入note；'
+  + '如果行內附有價錢（例如 $360），將該book場嘅總數（包埋波錢）放落price，冇就null。'
+  + '分隔線下面係打波名單，「名字 (開始-結束)」係每人打波時間，「跟X」即係跟X嘅時間（follow填X，冇就null）。'
+  + '另一種簡單格式：「時間：10-1 (俊1->賢2->Cathy3)」= 10點至13點（過正午自動+12），括號入面係邊個book咗第幾個鐘（第1個鐘=10-11，第2個=11-12…），'
+  + '下面啲人淨係名冇時間（例如「1.俊」）= 個個打足成個session。'
+  + 'start/end係數字（24小時制細時數，例如5-10）。只輸出JSON，唔好加任何其他文字或code fence。';
+
+async function aiParse(raw, cfg){
+  const base = String(cfg.base || '').replace(/\/+$/, '');
+  if (!base || !cfg.key) throw new Error('未填齊 API Base URL / API Key。');
+  const res = await fetch(base + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({
+      model: cfg.model || 'glm-4.6',
+      messages: [
+        { role: 'system', content: AI_SYS_PROMPT },
+        { role: 'user', content: String(raw) },
+      ],
+      temperature: 0,
+    }),
+  });
+  if (!res.ok) throw new Error('API 回應 ' + res.status + '：' + (await res.text()).slice(0, 300));
+  const j = await res.json();
+  let txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+  txt = txt.replace(/```[a-z]*\s*/gi, '').replace(/```/g, '').trim();
+  const first = txt.indexOf('{'), last = txt.lastIndexOf('}');
+  if (first < 0 || last <= first) throw new Error('AI 冇回傳JSON：' + txt.slice(0, 200));
+  const data = JSON.parse(txt.slice(first, last + 1));
+
+  const bookings = (data.bookings || []).map(b => ({
+    name: String(b.name || '').trim(), start: +b.start, end: +b.end,
+    hours: Math.max(0, (+b.end) - (+b.start)),
+    court: String(b.court || '') + (b.note ? ' ' + b.note : ''),
+    priceOverride: (b.price != null && !isNaN(+b.price)) ? +b.price : null,
+    srcLine: null,
+  })).filter(b => b.name && b.hours > 0);
+  const players = (data.players || []).map(p => {
+    if (p.follow) return { name: String(p.name).trim(), follow: String(p.follow).trim() };
+    return { name: String(p.name).trim(), start: +p.start, end: +p.end };
+  }).filter(p => p.name && (p.follow || p.end > p.start));
+
+  const issues = [];
+  resolveFollows(players, bookings, issues);
+  const merged = [], seen = new Map();
+  for (const p of players){
+    if (p.start == null) continue;
+    if (seen.has(p.name)) seen.get(p.name).hours += (p.end - p.start);
+    else { const q = { name: p.name, start: p.start, end: p.end, hours: p.end - p.start }; seen.set(p.name, q); merged.push(q); }
+  }
+  return { date: String(data.date || ''), venue: String(data.venue || ''), bookings, players: merged, issues };
+}
+
+/* ===================== UI ===================== */
+
+if (typeof document !== 'undefined' && document.getElementById('input')){
+
+const SAMPLE = [
+  '日期：17/9/2026 (四）',
+  '地點：上水龍琛體育館',
+  '時間場地：',
+  'H 5-6#6',
+  '賢 6-7#6',
+  '藍 6-7#5',
+  'Ivan 6-8#4轉8',
+  'J 7-9#7',
+  '禮 8-10#6轉3',
+  '-------------------',
+  '1.Red (6-9)',
+  '2.Kitty (7-10）',
+  '3.藍 (6-9)',
+  '4.Pauline (7-9)',
+  '5.Bonnie（7-9）',
+  '6.Elaine (5-9）',
+  '7.Cathy (5-9）',
+  '8.Winnie (5-8)',
+  '9.俊 (6-9)',
+  '8.源 (5-9)',
+  '10.Ringo (6-10)',
+  '12.明 （7-9）',
+  '12.Sam (7-10)',
+  '13.Alan (6-9)',
+  '14.賢 (跟H) ',
+  '15.Ivan (6-9)',
+  '16:Peter (6-10)',
+  '17.迪 (6-9)',
+  '18.H (5-9)',
+  '19.Jason (6-9）',
+  '--------截---------',
+].join('\n');
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS_KEY = 'badmintonCounterSettings';
+
+function loadSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    if (s.courtFee != null) $('courtFee').value = s.courtFee;
+    if (s.shuttleFee != null) $('shuttleFee').value = s.shuttleFee;
+    if (s.shuttlePayer) $('shuttlePayer').value = s.shuttlePayer;
+    if (s.aiBase) $('aiBase').value = s.aiBase;
+    if (s.aiModel) $('aiModel').value = s.aiModel;
+    if (s.aiKey) $('aiKey').value = s.aiKey;
+    if (s.lastInput) $('input').value = s.lastInput;
+  }catch(e){}
+}
+function saveSettings(){
+  const s = {
+    courtFee: $('courtFee').value, shuttleFee: $('shuttleFee').value,
+    shuttlePayer: $('shuttlePayer').value,
+    aiBase: $('aiBase').value, aiModel: $('aiModel').value, aiKey: $('aiKey').value,
+    lastInput: $('input').value,
+  };
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(s)); }catch(e){}
+}
+function aiCfg(){
+  return { base: $('aiBase').value.trim(), model: $('aiModel').value.trim(), key: $('aiKey').value.trim() };
+}
+function prices(){
+  return { court: Math.max(0, parseFloat($('courtFee').value) || 0),
+           shuttle: Math.max(0, parseFloat($('shuttleFee').value) || 0) };
+}
+
+let lastResult = null;
+let currentCtx = null; // { parsed, source } —— 場地明細改價嗰陣用嚟重計
+
+function render(parsed, result, source, doScroll){
+  doScroll = (doScroll !== false);
+  $('result').style.display = 'block';
+  $('badge').innerHTML = source === 'ai'
+    ? '<span class="badge badge-ai">🤖 AI 解析</span>'
+    : source === 'record'
+      ? '<span class="badge badge-rec">📜 舊記錄</span>'
+      : '<span class="badge badge-rule">📐 規則解析' + ((result.lists || 1) > 1 ? ' · ' + result.lists + ' 個清單' : '') + '</span>';
+
+  const issues = result.issues || [];
+  const warns = issues.filter(i => i.level !== 'info');
+  const infos = issues.filter(i => i.level === 'info');
+  let ih = '';
+  if (warns.length){
+    ih += '<div class="warnbox"><b>⚠️ 留意（計到數，但呢啲地方你最好睇一眼）</b><ul>'
+      + warns.map(i => '<li>' + esc(i.msg) + '</li>').join('')
+      + '<li>💡 格式規則：book 場行係「名 時間#場號」，人員行係「名 (開始-結束)」或「名 跟邊個」。想要格式點變都識讀？喺「🤖 AI 設定」填個 API key 就得。</li></ul></div>';
+  }
+  if (infos.length){
+    ih += '<div class="warnbox" style="background:#eff6ff;border-color:#93c5fd"><b>ℹ️ 提示</b><ul>'
+      + infos.map(i => '<li>' + esc(i.msg) + '</li>').join('') + '</ul></div>';
+  }
+  $('issues').innerHTML = ih;
+
+  const t = result.totals;
+  $('metaLine').textContent = [result.meta.date, result.meta.venue].filter(Boolean).join('｜');
+  $('cards').innerHTML = [
+    ['場租', fmtMoney(t.courtFee), t.courtHours + ' 場鐘'],
+    ['波錢', fmtMoney(t.shuttleFee), t.shuttlePH + ' 個計波鐘'],
+    ['總費用', fmtMoney(t.totalFee), ''],
+    ['打波人頭鐘', t.totalPH + ' hr', ''],
+    ['場租每鐘', fmtMoney(t.courtRate), '按人頭鐘分攤'],
+  ].map(c => `<div class="stat"><div class="k">${esc(c[0])}${c[2] ? ' · ' + esc(c[2]) : ''}</div><div class="v">${esc(c[1])}</div></div>`).join('');
+
+  const multi = (result.lists || 1) > 1;
+  $('bookTable').innerHTML =
+    '<tr>' + (multi ? '<th class="num">#</th>' : '') + '<th>Book場人</th><th class="num">時間</th><th>場</th><th class="num">鐘數</th><th class="num">場租 ✏️</th><th class="num">波錢</th></tr>'
+    + result.bookings.map((b, i) =>
+      `<tr${b.overridden ? ' style="background:#fff7ed"' : ''}>${multi ? `<td class="num">${b.seg != null ? b.seg : ''}</td>` : ''}<td>${esc(b.name)}</td><td class="num">${b.start}-${b.end}</td><td>${esc(b.court)}</td>`
+      + `<td class="num">${b.hours}</td><td class="num"><input type="number" step="0.5" min="0" class="feeInput" data-i="${i}" data-line="${b.srcLine != null ? b.srcLine : -1}" value="${+b.courtFee.toFixed(1)}" title="呢個場嘅總數（包埋波錢），可以改成特別價"></td><td class="num">${b.overridden ? '<span class="zero">已包</span>' : '計波'}</td></tr>`
+    ).join('');
+
+  const paidMap = (currentCtx && currentCtx.paidMap) || {};
+  $('peopleTable').innerHTML =
+    '<tr><th>名</th><th class="num">時間</th><th class="num">打鐘</th><th class="num">波鐘</th><th class="num">應付</th><th class="num">墊支</th><th>淨數</th><th>搞掂 ✓</th></tr>'
+    + result.everyone.map(p => {
+        let cls = 'zero', txt = '平';
+        if (p.net > 0.001){ cls = 'pos'; txt = '你找返佢 ' + fmtMoney(p.net); }
+        else if (p.net < -0.001){ cls = 'neg'; txt = '佢俾你 ' + fmtMoney(-p.net); }
+        const need = Math.abs(p.net) > 0.001;
+        const chk = need
+          ? `<input type="checkbox" class="paidChk" data-name="${esc(p.name)}" ${paidMap[p.name] ? 'checked' : ''} title="${p.net < 0 ? '已收佢錢' : '已找返錢俾佢'}">`
+          : '—';
+        return `<tr><td>${esc(p.name)}</td><td class="num">${esc(p.timeLabel || '—')}</td>`
+          + `<td class="num">${p.played ? p.hours : '—'}</td><td class="num">${p.played ? p.shuttleHours : '—'}</td><td class="num">${fmtMoney(p.share)}</td>`
+          + `<td class="num">${p.fronted ? fmtMoney(p.fronted) : '—'}</td><td class="${cls}">${txt}</td><td>${chk}</td></tr>`;
+      }).join('');
+
+  const bal = result.balance;
+  let balHtml = `<b class="big">你會收：${fmtMoney(bal.collect)}</b>　<b class="big">你要找返：${fmtMoney(bal.payBack)}</b><br>`;
+  if (bal.shuttleUnassigned > 0){
+    balHtml += `收多出嚟嘅 ${fmtMoney(bal.shuttleUnassigned)} 就係波錢（未指明邊個墊支）——記得用嚟找返買波嗰位，或者喺設定度填咗佢個名。`;
+  } else {
+    balHtml += '收同找返差額係 $0，條數啱啱平 🎉'
+      + (result.meta.shuttlePayer
+        ? `（波錢 ${fmtMoney(t.shuttleFee)} 已當 ${esc(result.meta.shuttlePayer)} 墊支${result.meta.shuttlePayer === 'Cathy' ? ' —— 即係你自己留返呢筆' : ''}）`
+        : '');
+  }
+  const payers = result.everyone.filter(p => p.net < -0.001);
+  const getters = result.everyone.filter(p => p.net > 0.001);
+  if (payers.length){
+    const gotN = payers.filter(p => paidMap[p.name]).length;
+    const gotSum = payers.filter(p => paidMap[p.name]).reduce((a, p) => a - p.net, 0);
+    balHtml += `<br>✅ 已收 ${gotN}/${payers.length} 人（${fmtMoney(gotSum)} / ${fmtMoney(bal.collect)}）`;
+  }
+  if (getters.length){
+    const paidN = getters.filter(p => paidMap[p.name]).length;
+    const paidSum = getters.filter(p => paidMap[p.name]).reduce((a, p) => a + p.net, 0);
+    balHtml += `　🎯 已找返 ${paidN}/${getters.length} 人（${fmtMoney(paidSum)} / ${fmtMoney(bal.payBack)}）`;
+  }
+  $('balanceBox').innerHTML = balHtml;
+
+  const dl = $('nameOptions');
+  dl.innerHTML = [...new Set(result.everyone.map(p => esc(p.name)))].map(n => `<option value="${n}">`).join('');
+
+  $('waPreview').value = buildWhatsAppText(result);
+  $('copyNote').textContent = '';
+  if (doScroll) $('result').scrollIntoView({ behavior: 'auto', block: 'start' });
+}
+
+function runCalc(useAI){
+  const raw = $('input').value.trim();
+  if (!raw){ alert('貼個清單落去先啦！'); return; }
+  const c = prices(), sp = $('shuttlePayer').value;
+  saveSettings();
+  const btn = useAI ? $('btnAI') : $('btnCalc');
+  const old = btn.textContent;
+  btn.textContent = '⏳ 計緊…'; btn.disabled = true;
+
+  const doRender = (parsed, source) => {
+    const result = compute(parsed, c, sp);
+    if (result.error){ alert(result.error); return false; }
+    lastResult = result;
+    const keepPaid = (currentCtx && currentCtx.raw === raw && currentCtx.paidMap) || null;
+    const rec = addRecord(raw, result, keepPaid);
+    currentCtx = {
+      parsed,
+      recompute: () => compute(parsed, prices(), $('shuttlePayer').value),
+      source,
+      raw,
+      paidMap: (rec && rec.paid) || {},
+      recordId: rec ? rec.id : null,
+    };
+    render(parsed, result, source);
+    return true;
+  };
+
+  Promise.resolve().then(async () => {
+    const segs = parseMulti(raw);
+    if (segs.length > 1){
+      if (useAI) alert('一次過多個清單暫時未支援 AI 解析，幫你用規則解析計咗先。');
+      const result = computeMultiParsed(segs, c, sp);
+      if (result.error){ alert(result.error); return; }
+      lastResult = result;
+      const keepPaid = (currentCtx && currentCtx.raw === raw && currentCtx.paidMap) || null;
+      const rec = addRecord(raw, result, keepPaid);
+      currentCtx = {
+        parsed: { bookings: segs.flatMap(s => s.bookings) },
+        recompute: () => computeMultiParsed(segs, prices(), $('shuttlePayer').value),
+        source: 'rule',
+        raw,
+        paidMap: (rec && rec.paid) || {},
+        recordId: rec ? rec.id : null,
+      };
+      render(null, result, 'rule');
+      return;
+    }
+    if (useAI){
+      try{
+        const parsed = await aiParse(raw, aiCfg());
+        doRender(parsed, 'ai');
+      }catch(err){
+        alert('用 AI 解析失敗：' + err.message + '\n\n用返規則解析嘅結果（如果有）。');
+        const parsed = parseList(raw);
+        doRender(parsed, 'rule');
+      }
+    } else {
+      const parsed = parseList(raw);
+      const bad = parsed.issues.some(i => i.level === 'error');
+      const cfg = aiCfg();
+      if (bad && cfg.base && cfg.key){
+        try{
+          const aiParsed = await aiParse(raw, cfg);
+          doRender(aiParsed, 'ai');
+        }catch(err){
+          doRender(parsed, 'rule');
+        }
+      } else {
+        doRender(parsed, 'rule');
+      }
+    }
+  }).finally(() => { btn.textContent = old; btn.disabled = false; });
+}
+
+$('btnCalc').addEventListener('click', () => runCalc(false));
+$('btnAI').addEventListener('click', () => runCalc(true));
+$('btnSample').addEventListener('click', () => { $('input').value = SAMPLE; saveSettings(); });
+$('btnClear').addEventListener('click', () => { $('input').value = ''; $('result').style.display = 'none'; currentCtx = null; saveSettings(); });
+
+// 場地明細改特別價 → 即刻重計，並且寫返落清單度（下次重計都keep住）
+$('bookTable').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('feeInput')){
+    ev.preventDefault();
+    ev.target.blur();
+  }
+});
+$('bookTable').addEventListener('change', ev => {
+  const inp = ev.target;
+  if (!inp.classList || !inp.classList.contains('feeInput') || !currentCtx) return;
+  if (!currentCtx.parsed && !currentCtx.recompute) return; // 舊記錄唔比改價
+  const i = +inp.dataset.i;
+  const b = currentCtx.parsed && currentCtx.parsed.bookings[i];
+  if (!b) return;
+  const v = parseFloat(inp.value);
+  b.priceOverride = isNaN(v) ? null : v;
+  if (b.srcLine != null && b.srcLine >= 0){
+    const ta = $('input');
+    const arr = ta.value.split(/\r?\n/);
+    if (arr[b.srcLine] != null && arr[b.srcLine].trim() !== ''){
+      const priceTag = b.priceOverride != null ? ' $' + (+b.priceOverride.toFixed(1)) : '';
+      arr[b.srcLine] = `${b.name} ${b.start}-${b.end}#${b.court}${priceTag}`;
+      ta.value = arr.join('\n');
+    }
+  }
+  saveSettings();
+  const result = currentCtx.recompute
+    ? currentCtx.recompute()
+    : compute(currentCtx.parsed, prices(), $('shuttlePayer').value);
+  if (!result.error){
+    lastResult = result;
+    render(currentCtx.parsed, result, currentCtx.source, false);
+    const rec2 = addRecord($('input').value.trim(), result, currentCtx.paidMap);
+    if (rec2){ currentCtx.recordId = rec2.id; currentCtx.raw = $('input').value.trim(); }
+  }
+});
+$('btnCopy').addEventListener('click', async () => {
+  const txt = $('waPreview').value;
+  try{
+    await navigator.clipboard.writeText(txt);
+    $('copyNote').textContent = '✅ 已複製，去群組貼低佢啦！';
+  }catch(e){
+    $('waPreview').select();
+    document.execCommand('copy');
+    $('copyNote').textContent = '✅ 已複製（舊方法），去群組貼低佢啦！';
+  }
+});
+['courtFee','shuttleFee','shuttlePayer','aiBase','aiModel','aiKey'].forEach(id =>
+  $(id).addEventListener('change', saveSettings));
+$('input').addEventListener('blur', saveSettings);
+
+function refreshAIBtn(){
+  const c = aiCfg();
+  $('btnAI').style.display = (c.base && c.key) ? '' : 'none';
+}
+['aiBase','aiKey'].forEach(id => $(id).addEventListener('change', refreshAIBtn));
+
+/* ---- 記錄（history）：存本機 localStorage，可匯出/匯入 ---- */
+
+const HIST_KEY = 'badmintonCounterHistory';
+
+function loadHist(){
+  try{ const a = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function saveHistList(list){
+  try{ localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 100))); }catch(e){}
+}
+function addRecord(raw, result, paidMap){
+  if (!raw || !result) return null;
+  const list = loadHist();
+  const i = list.findIndex(r => r.raw === raw);
+  const carried = paidMap || (i >= 0 ? (list[i].paid || {}) : {});
+  const rec = {
+    id: Date.now(), ts: new Date().toISOString(),
+    date: result.meta.date, venue: result.meta.venue,
+    totalFee: result.totals.totalFee, collect: result.balance.collect, payBack: result.balance.payBack,
+    raw, result, paid: carried,
+  };
+  if (i >= 0) list.splice(i, 1);
+  list.unshift(rec);
+  saveHistList(list);
+  renderHist();
+  return rec;
+}
+function renderHist(){
+  const list = loadHist();
+  if (!list.length){
+    $('histTable').innerHTML = '<tr><td class="zero">（仲未有記錄 —— 計一次數就會自動存低）</td></tr>';
+    return;
+  }
+  const payState = r => {
+    const es = (r.result && r.result.everyone) || [];
+    const payers = es.filter(p => p.net < -0.001);
+    if (!payers.length) return '—';
+    const n = payers.filter(p => r.paid && r.paid[p.name]).length;
+    return n >= payers.length ? '✅ 收齊' : '已收 ' + n + '/' + payers.length;
+  };
+  $('histTable').innerHTML =
+    '<tr><th>日期</th><th>地點</th><th class="num">總數</th><th class="num">你收</th><th class="num">你找返</th><th>收數</th><th></th></tr>'
+    + list.map(r => {
+        const st = payState(r);
+        return `<tr class="histRow" data-id="${r.id}"${st === '✅ 收齊' ? ' style="background:#f0fdf4"' : ''}>`
+        + `<td>${esc(r.date || r.ts.slice(0, 10))}</td><td>${esc(r.venue || '—')}</td>`
+        + `<td class="num">${fmtMoney(r.totalFee)}</td><td class="num">${fmtMoney(r.collect)}</td><td class="num">${fmtMoney(r.payBack)}</td>`
+        + `<td>${st}</td>`
+        + `<td><button class="btn-sm loadBtn" data-id="${r.id}">↺ 載入</button> <button class="btn-sm delBtn" data-id="${r.id}">✕</button></td></tr>`;
+      }).join('');
+}
+
+$('histTable').addEventListener('click', ev => {
+  const del = ev.target.closest('.delBtn');
+  if (del){
+    saveHistList(loadHist().filter(r => r.id !== +del.dataset.id));
+    renderHist();
+    return;
+  }
+  const load = ev.target.closest('.loadBtn');
+  if (load){
+    const rec = loadHist().find(r => r.id === +load.dataset.id);
+    if (rec){
+      $('input').value = rec.raw;
+      saveSettings();
+      $('input').scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
+    return;
+  }
+  const row = ev.target.closest('.histRow');
+  if (row){
+    const rec = loadHist().find(r => r.id === +row.dataset.id);
+    if (rec){
+      currentCtx = { parsed: null, source: 'record', raw: rec.raw, paidMap: rec.paid || {}, recordId: rec.id };
+      render(null, rec.result, 'record');
+    }
+  }
+});
+
+/* ---- 已收錢 ✓ ---- */
+
+$('peopleTable').addEventListener('change', ev => {
+  const chk = ev.target;
+  if (!chk.classList || !chk.classList.contains('paidChk') || !currentCtx) return;
+  currentCtx.paidMap = currentCtx.paidMap || {};
+  currentCtx.paidMap[chk.dataset.name] = chk.checked;
+  persistPaid();
+});
+
+function persistPaid(){
+  if (!currentCtx || currentCtx.recordId == null || !lastResult) return;
+  const list = loadHist();
+  const rec = list.find(r => r.id === currentCtx.recordId);
+  if (rec){ rec.paid = currentCtx.paidMap || {}; saveHistList(list); }
+  render(null, lastResult, currentCtx.source || 'rule', false);
+  renderHist();
+}
+
+$('btnExport').addEventListener('click', () => {
+  const list = loadHist();
+  if (!list.length){ alert('仲未有記錄可以匯出。'); return; }
+  const blob = new Blob([JSON.stringify(list)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'badminton-records-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$('btnImport').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      const arr = JSON.parse(rd.result);
+      if (!Array.isArray(arr)) throw new Error('唔係記錄格式');
+      const list = loadHist();
+      for (const r of arr){
+        if (!r || !r.result || !r.raw) continue;
+        const i = list.findIndex(x => x.raw === r.raw);
+        if (i >= 0) list.splice(i, 1);
+        list.push(r);
+      }
+      list.sort((a, b) => (b.id || 0) - (a.id || 0));
+      saveHistList(list); renderHist();
+      alert('匯入完成，而家總共 ' + list.length + ' 條記錄。');
+    }catch(e){
+      alert('呢個檔讀唔到 —— 確認係「匯出備份」落地嘅 JSON 檔？');
+    }
+  };
+  rd.readAsText(f);
+  ev.target.value = '';
+});
+$('btnClearHist').addEventListener('click', () => {
+  if (confirm('真係要清空晒所有記錄？（建議先匯出備份）')){
+    saveHistList([]); renderHist();
+  }
+});
+
+loadSettings();
+refreshAIBtn();
+renderHist();
+}
+</script>
+</body>
+</html>
