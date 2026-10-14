@@ -84,13 +84,14 @@
 
   <div class="card">
     <label for="input">清單（照抄 WhatsApp 個 format 貼落嚟）</label>
-    <textarea id="input" placeholder="日期：17/9/2026 (四）
-地點：上水龍琛體育館
-時間場地：
-H 5-6#6
--------------------
-1.Red (6-9)
-2.Kitty (7-10）
+    <textarea id="input" placeholder="日期：28/9/2026 (一)
+地點：龍琛體育館
+時間：下午7-9
+場地：Red#8、3
+------------
+1.Red
+2.源
+3.Jason
 ..."></textarea>
     <div class="btnrow">
       <button class="btn-primary" id="btnCalc">🧮 計數</button>
@@ -145,7 +146,7 @@ H 5-6#6
         <li>某個場有特別價？喺「場地明細」改嗰格，或者喺清單行尾加「 $360」。特別價 = 嗰個場嘅總數（已包埋波錢），唔會再另加波錢</li>
         <li>可以一次過貼幾個清單（例如兩三個禮拜嘅數一齊結）：下一份以「日期：」開頭會自動分開，或者中間加一行「=====」，各人條數會合併出總數</li>
         <li>簡單格式都認得：「1/10」淨一行當日期；「時間：10-1 (俊1→賢2→Cathy3)」= 10點至1點、邊個 book 咗邊個鐘；下面淨係名冇時間（1.俊）= 個個當打足成個 session</li>
-        <li>「時間：下午7-9」呢啲上／下午寫法都認得（自動轉 24 小時）；「場地：Red#8、3」= Red book 咗 8 號同 3 號場、用「時間」嗰行嘅時段，每個場各開一場</li>
+        <li>「時間」行點寫都好：「下午7-9」「7-9pm」「7時-9時」「7至9」都識；「場地」行「Red」= Red book 一個場、「Red、Ken」= 兩個人各一個場、「Red#8、3」= Red book 咗 8、3 號兩個場 —— 時間跟「時間」行，場數跟名同場號</li>
         <li>「搞掂 ✓」欄勾一勾 = 記住邊個已俾錢／你已找返錢；記錄表會顯示「已收 x/y」，收齊變「✅ 收齊」</li>
         <li>「跟X」= 跟 X 嘅打波時間（以打波名單嘅時間為準，唔係佢 book 場嘅時間）</li>
       </ul>
@@ -232,24 +233,34 @@ function parseList(raw){
 
   let date = '', venue = '', session = null;
   const bookings = [];
+  const pendingCourtNames = []; // 「場地：Red」呢啲冇場號嘅名，解析埋人員先決定係 book 場定地點
   for (const e of headEntries){
     const l = e.text;
     let m = l.match(/^日期\s*[:：]?\s*(.*)$/);
     if (m){ date = m[1].trim(); continue; }
     m = l.match(/^地點\s*[:：]?\s*(.*)$/);
     if (m){ venue = m[1].trim(); continue; }
-    if (/^時間場地/.test(l) && !/\d/.test(l)) continue;
+    if ((/^時間場地/.test(l) || /^[場埸]地\s*[:：]?$/.test(l)) && !/\d/.test(l)) continue;
     // 簡單格式：「時間：10-1 (俊1->賢2->Cathy3)」= session 時間 + 邊個 book 咗邊個鐘
-    // 亦認得「下午7-9」呢啲上/下午前綴（自動轉 24 小時制）
-    const AMPM = '(?:上午|下午|晚上|中午|凌晨|朝早|早晨|傍晚)';
-    const sm = l.match(new RegExp('^時間(?:場地)?\\s*[:：]?\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*-\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*(?:\\(\\s*([^)]*)\\s*\\))?'));
+    // 前綴後綴都認：「下午7-9」「7-9pm」「7時-9時」「7至9」
+    const AMPM = '(?:上午|下午|晚上|中午|凌晨|朝早|早晨|傍晚|[ap]\\.?m\\.?)';
+    const sm = l.match(new RegExp(
+      '^時間(?:場地)?\\s*[:：]?\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?\\s*[-至到]\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?\\s*(?:\\(\\s*([^)]*)\\s*\\))?', 'i'));
     if (sm){
-      const to24 = (ap, h) => { let v = +h; if (v < 12 && /下午|晚上|中午|傍晚/.test(ap || '')) v += 12; return v; };
-      let sh = to24(sm[1], sm[2]), eh = to24(sm[3], sm[4]);
+      const to24 = (pre, h, post) => {
+        let v = +h;
+        const tag = String(pre || '') + String(post || '');
+        if (v < 12 && /下午|晚上|中午|傍晚|pm/i.test(tag)) v += 12;
+        return v;
+      };
+      let sh = to24(sm[1], sm[2], sm[3]), eh = to24(sm[4], sm[5], sm[6]);
       while (eh <= sh) eh += 12; // 「10-1」= 10點至下晝1點；「下午7-9」= 19-21
+      // 「7-9pm」：pm 淨係寫咗喺尾，開頭冇標記又計到超過 12 個鐘 → 開頭都當係 pm
+      if (!sm[1] && !sm[3] && sh < 12 && eh - sh > 12 &&
+          /下午|晚上|中午|傍晚|pm/i.test(String(sm[4] || '') + String(sm[6] || ''))) sh += 12;
       session = { start: sh, end: eh };
-      if (sm[5]){
-        const toks = sm[5].split(/->|→|,|，|、|>|;|；/).map(x => x.trim()).filter(Boolean);
+      if (sm[7]){
+        const toks = sm[7].split(/->|→|,|，|、|>|;|；/).map(x => x.trim()).filter(Boolean);
         toks.forEach((tk, idx) => {
           const tk2 = tk.match(/^(.+?)(\d{1,2})$/);
           const bname = (tk2 ? tk2[1] : tk).trim();
@@ -289,20 +300,26 @@ function parseList(raw){
       bookings.push({ name, start, end, hours: end - start, court: m[4].trim(), priceOverride, srcLine: e.idx });
       continue;
     }
-    // 冇時間嘅 book 場（例如「Red#8、3」）：用「時間」嗰行嘅時段，每個場號（、或,分隔）各開一場
+    // 冇時間嘅 book 場：用「時間」嗰行嘅時段。有 # 嘅一段 =「名#場號(、場號)」；一段冇 # = 嗰個人 book 一個場
     if (session && /#/.test(body)){
-      const nt = body.match(/^(.+?)\s*#\s*(.+)$/);
-      const bname = nt ? nt[1].replace(/[:：]\s*$/, '').trim() : '';
-      const courts = nt ? nt[2].split(/[、,，\/和及]|\s+/).map(c => c.replace(/^#/, '').trim()).filter(Boolean) : [];
-      if (bname && courts.length){
+      let ok = false;
+      for (const seg of body.split(/\s+/).map(s => s.trim()).filter(Boolean)){
+        const nt = seg.match(/^(.+?)#\s*(.+)$/);
+        const bname = (nt ? nt[1] : seg).replace(/[:：]\s*$/, '').trim();
+        const courts = nt ? nt[2].split(/[、,，\/和及]/).map(c => c.replace(/^#/, '').trim()).filter(Boolean) : ['—'];
+        if (!bname || !courts.length) continue;
+        ok = true;
         if (priceOverride != null && courts.length > 1)
           issues.push({level:'warn', msg:`「${l}」嘅 $${priceOverride} 會當做每個場嘅價；如果係幾個場夾埋嘅總數，記得喺「場地明細」手動改返。`});
         courts.forEach(c => bookings.push({ name: bname, start: session.start, end: session.end, hours: session.end - session.start, court: c, priceOverride, srcLine: e.idx }));
-        continue;
       }
+      if (ok) continue;
     }
-    // 「場地：」行冇場號、又未填過地點 → 當係地點
-    if (venuePrefix && !venue && !/#/.test(body)){ venue = body; continue; }
+    // 「場地：Red」／「場地：Red、Ken」：冇場號 —— 記住啲名，解析埋人員名單之後先判斷
+    if (venuePrefix){
+      pendingCourtNames.push(...body.split(/[、,，\/]|\s+/).map(t => t.trim()).filter(t => t && !/^\d+([-~]\d+)?$/.test(t)));
+      continue;
+    }
     if (l.trim() !== '' && divIdx.length > 0) issues.push({level:'warn', msg:`場地嗰度認唔出行：「${l}」`});
   }
 
@@ -364,6 +381,27 @@ function parseList(raw){
         continue;
       }
       // 唔係玩家就靜靜哋跳過（可能係備註）
+    }
+  }
+
+  // 「場地：」行冇場號嗰啲名：係打波名單／已有 book 場入面嘅名 = book 咗一個場（用 session 時段）；
+  // 唔係人名但未填過地點 = 當地點（例如淨係寫「場地：龍琛體育館」冇「地點：」行）
+  if (pendingCourtNames.length){
+    const known = new Set(players.map(p => p.name).concat(bookings.map(b => b.name)));
+    for (const tk of pendingCourtNames){
+      const isPerson = known.has(tk);
+      if (!session){
+        if (isPerson) issues.push({level:'warn', msg:`「場地」有「${tk}」，但搵唔到「時間」嗰行，計唔到佢 book 嘅場。`});
+        else if (!venue) venue = tk;
+        continue;
+      }
+      if (isPerson || (venue && !/館/.test(tk))){
+        bookings.push({ name: tk, start: session.start, end: session.end, hours: session.end - session.start, court: '—', priceOverride: null, srcLine: null });
+      } else if (!venue){
+        venue = tk;
+      } else {
+        issues.push({level:'warn', msg:`「場地」嗰度嘅「${tk}」認唔到係咩（打波名單冇呢個名），跳過咗。`});
+      }
     }
   }
 
