@@ -72,6 +72,24 @@
   .wa{width:100%;min-height:110px;font-size:.85em;font-family:inherit}
   #result{display:none}
   .ok-note{color:var(--muted);font-size:.85em;margin-top:6px}
+  .hourTicks{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .hourTicks label{display:inline-flex;align-items:center;gap:5px;background:#f0fdf9;border:1px solid #99f6e4;border-radius:8px;padding:4px 10px;font-size:.92em;color:var(--ink);cursor:pointer;margin:0}
+  .hourTicks input{accent-color:var(--teal);width:16px;height:16px;margin:0}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .chipwrap{display:inline-flex;align-items:center;gap:2px}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:#fafafa;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.92em;cursor:pointer;margin:0}
+  .chip input{accent-color:var(--teal);width:16px;height:16px;margin:0}
+  .chip .psel{display:none;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:.85em;padding:1px 3px;background:#fff;color:var(--ink)}
+  .chipwrap.on .chip{background:#f0fdf9;border-color:#5eead4;font-weight:600}
+  .chipwrap.on .psel{display:inline-block}
+  .chipx{border:none;background:none;color:#b0b7c0;cursor:pointer;padding:2px 5px;font-size:.85em}
+  .chipx:hover{color:var(--bad)}
+  .sqlbox{width:100%;min-height:130px;font-size:.8em;font-family:Consolas,Menlo,monospace;background:#f8fafc;border:1px dashed var(--line);border-radius:8px;padding:8px;color:#334155;margin-top:4px}
+  .bkRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-top:6px}
+  .bkRow .bkName{font-weight:600;color:var(--teal-dark)}
+  .bkRow .hint{margin:0}
+  .bkRow input[type=number]{width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:.9em}
+  .hourTicks.inline{margin-top:0}
   @media (max-width:480px){ .stat .v{font-size:1.05em} table{font-size:.85em} }
 </style>
 </head>
@@ -82,9 +100,49 @@
     <p>貼個清單落去，自動計出每人應付 / 應收。</p>
   </header>
 
+  <div class="card" id="formCard">
+    <label style="font-weight:600;margin-top:2px">📝 落單（填一次、tick 下就計到）</label>
+    <div class="row">
+      <div>
+        <label for="fDate">日期</label>
+        <input type="date" id="fDate">
+      </div>
+      <div>
+        <label for="fTime">時間（例如 下午7-9 / 7-9pm / 7時-9時）</label>
+        <input type="text" id="fTime" placeholder="下午7-9">
+      </div>
+    </div>
+    <label>邊個 book 場（tick；tick 咗嘅人下面會出現佢自己嘅「場數」同「邊幾個鐘」）</label>
+    <div id="fBookers"></div>
+    <label style="margin-top:12px">有邊個打？（tick 邊個打；名單入一次會記住，下次 tick 返就得）</label>
+    <div id="fRoster" class="chips"></div>
+    <div class="row" style="margin-top:6px">
+      <div>
+        <input type="text" id="fNewName" placeholder="加個名入名單（打完撳 Enter）">
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="btn-primary" id="btnFormCalc">🧮 計數（呢一日）</button>
+      <button id="btnAddBasket">➕ 加落呢批</button>
+      <button id="btnFormAll">全部都打</button>
+      <button id="btnFormReset">清空 tick</button>
+    </div>
+    <div id="basketBox" style="display:none;margin-top:12px">
+      <label id="basketLbl" style="font-weight:600">📊 今批入面有：</label>
+      <div id="basketList" class="chips"></div>
+      <div class="btnrow">
+        <button class="btn-primary" id="btnCalcBatch">🧮 計晒成批</button>
+        <button id="btnClearBasket">🧹 清返個批</button>
+      </div>
+    </div>
+    <p class="hint">每人打幾多個鐘預設跟足成個時段；有人打半場嘅話，tick 咗佢之後喺個名後面揀返邊段。計完會自動存落下面「📜 記錄」。<b>想幾日一齊結數？</b>每填好一日撳「➕ 加落呢批」，改個日期 tick 返嗰日啲人，再填下一日，齊咗撳「🧮 計晒成批」，各人幾日嘅數會自動夾埋出總數。</p>
+  </div>
+
   <div class="card">
-    <label for="input">清單（照抄 WhatsApp 個 format 貼落嚟）</label>
-    <textarea id="input" placeholder="日期：28/9/2026 (一)
+    <details>
+      <summary>📋 貼 WhatsApp 清單（舊模式照舊用得；表格計數後，砌好嘅清單會喺度出現）</summary>
+      <label for="input">清單</label>
+      <textarea id="input" placeholder="日期：28/9/2026 (一)
 地點：龍琛體育館
 時間：下午7-9
 場地：Red#8、3
@@ -93,12 +151,13 @@
 2.源
 3.Jason
 ..."></textarea>
-    <div class="btnrow">
-      <button class="btn-primary" id="btnCalc">🧮 計數</button>
-      <button id="btnSample">載入示例</button>
-      <button id="btnAI" class="btn-ai" style="display:none">🤖 用 AI 重新解析</button>
-      <button id="btnClear">清空</button>
-    </div>
+      <div class="btnrow">
+        <button class="btn-primary" id="btnCalc">🧮 計數</button>
+        <button id="btnSample">載入示例</button>
+        <button id="btnAI" class="btn-ai" style="display:none">🤖 用 AI 重新解析</button>
+        <button id="btnClear">清空</button>
+      </div>
+    </details>
 
     <details>
       <summary>⚙️ 價錢同其他設定</summary>
@@ -132,6 +191,39 @@
         <label for="aiKey">API Key</label>
         <input type="password" id="aiKey" placeholder="只會存喺你部機嘅瀏覽器（localStorage）">
         <p class="hint">規則解析唔到嗰陣，可以撳「用 AI 重新解析」叫 AI 幫手讀清單（淨係解析，計數照舊喺本機做）。部分服務瀏覽器直連可能會 CORS 錯，咁就要用第二個供應商或者代理。</p>
+      </details>
+      <details style="margin-top:12px">
+        <summary>☁️ 跨機同步（Supabase 免費；唔填就完全唔會上網）</summary>
+        <div class="row">
+          <div>
+            <label for="syncCode">同步碼（自訂一串字，部部機填同一個；唔好太易估）</label>
+            <input type="text" id="syncCode" placeholder="例如 dragon-mon-2846">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="sbUrl">Supabase Project URL</label>
+            <input type="text" id="sbUrl" placeholder="https://xxxxx.supabase.co">
+          </div>
+          <div>
+            <label for="sbKey">anon public key</label>
+            <input type="password" id="sbKey" placeholder="Dashboard → Settings → API">
+          </div>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn-sm" id="btnSync">☁️ 即刻同步</button>
+          <span class="hint" id="syncNote" style="align-self:center;margin-top:0"></span>
+        </div>
+        <p class="hint">開法（一次過，約 5 分鐘）：去 supabase.com 用 GitHub 戶口開個免費 project → SQL Editor 貼下面段嘢撳 Run → 攞 Project URL 同 anon key 填上面 → 每部機都係咁填同一個同步碼。同步範圍：名單＋記錄＋收數 tick＋價錢設定（兩邊都有改動就以上次改嗰部機為準）。段 SQL：</p>
+        <textarea class="sqlbox" readonly>create table bm_state (
+  code text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table bm_state enable row level security;
+create policy "bm_read" on bm_state for select using (true);
+create policy "bm_insert" on bm_state for insert with check (true);
+create policy "bm_update" on bm_state for update using (true);</textarea>
       </details>
     </details>
 
@@ -181,10 +273,11 @@
       <button class="btn-sm" id="btnExport">📦 匯出備份</button>
       <button class="btn-sm" id="btnImport">📥 匯入備份</button>
       <button class="btn-sm" id="btnClearHist">🗑️ 清空</button>
+      <button class="btn-sm" id="btnMergeHist">🔗 合併結算</button>
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
     </div>
     <div class="tablewrap"><table id="histTable"></table></div>
-    <p class="hint">「↺ 載入」= 攞返個清單入去改。記錄只存喺呢部機嘅瀏覽器 —— 換機／清 cache 之前記得匯出備份。</p>
+    <p class="hint">「↺ 載入」= 攞返個清單入去改；想幾日一齊埋數，就喺最左手邊 🔗 格 tick 幾單再撳「🔗 合併結算」。「匯出備份」包埋名單、設定同記錄 —— 換機／清 cache 之前記得匯出，或者用「☁️ 跨機同步」自動搞掂。</p>
   </div>
 </div>
 
@@ -212,6 +305,31 @@ function isDivider(line){
 }
 
 const BOOK_RE = /^(.+?)\s*(\d{1,2})\s*-\s*(\d{1,2})\s*#\s*(.+)$/;
+
+// 時間寫法（parseList 同下面「填表模式」共用）：「10-1」「下午7-9」「7-9pm」「7時-9時」「7至9」
+const AMPM = '(?:上午|下午|晚上|中午|凌晨|朝早|早晨|傍晚|[ap]\\.?m\\.?)';
+const TIME_CORE = '(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?\\s*[-至到]\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?';
+const SM_RE = new RegExp('^時間(?:場地)?\\s*[:：]?\\s*' + TIME_CORE + '\\s*(?:\\(\\s*([^)]*)\\s*\\))?', 'i');
+const T_RE = new RegExp('^\\s*' + TIME_CORE, 'i');
+const to24 = (pre, h, post) => {
+  let v = +h;
+  const tag = String(pre || '') + String(post || '');
+  if (v < 12 && /下午|晚上|中午|傍晚|pm/i.test(tag)) v += 12;
+  return v;
+};
+function parseTimeCore(m){
+  let sh = to24(m[1], m[2], m[3]), eh = to24(m[4], m[5], m[6]);
+  while (eh <= sh) eh += 12; // 「10-1」= 10點至下晝1點
+  // 「7-9pm」：pm 淨係寫咗喺尾，開頭冇標記又計到超過 12 個鐘 → 開頭都當係 pm
+  if (!m[1] && !m[3] && sh < 12 && eh - sh > 12 &&
+      /下午|晚上|中午|傍晚|pm/i.test(String(m[4] || '') + String(m[6] || ''))) sh += 12;
+  return { start: sh, end: eh };
+}
+function parseTimeRange(t){
+  const s = normLine(t).replace(/^時間(?:場地)?\s*[:：]\s*/, '');
+  const m = s.match(T_RE);
+  return m ? parseTimeCore(m) : null;
+}
 
 function parseList(raw){
   const issues = [];
@@ -242,23 +360,11 @@ function parseList(raw){
     if (m){ venue = m[1].trim(); continue; }
     if ((/^時間場地/.test(l) || /^[場埸]地\s*[:：]?$/.test(l)) && !/\d/.test(l)) continue;
     // 簡單格式：「時間：10-1 (俊1->賢2->Cathy3)」= session 時間 + 邊個 book 咗邊個鐘
-    // 前綴後綴都認：「下午7-9」「7-9pm」「7時-9時」「7至9」
-    const AMPM = '(?:上午|下午|晚上|中午|凌晨|朝早|早晨|傍晚|[ap]\\.?m\\.?)';
-    const sm = l.match(new RegExp(
-      '^時間(?:場地)?\\s*[:：]?\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?\\s*[-至到]\\s*(' + AMPM + ')?\\s*(\\d{1,2})\\s*[時时點点]?\\s*(' + AMPM + ')?\\s*(?:\\(\\s*([^)]*)\\s*\\))?', 'i'));
+    // 前綴後綴都認（parseTimeCore 一條式過晒）
+    const sm = l.match(SM_RE);
     if (sm){
-      const to24 = (pre, h, post) => {
-        let v = +h;
-        const tag = String(pre || '') + String(post || '');
-        if (v < 12 && /下午|晚上|中午|傍晚|pm/i.test(tag)) v += 12;
-        return v;
-      };
-      let sh = to24(sm[1], sm[2], sm[3]), eh = to24(sm[4], sm[5], sm[6]);
-      while (eh <= sh) eh += 12; // 「10-1」= 10點至下晝1點；「下午7-9」= 19-21
-      // 「7-9pm」：pm 淨係寫咗喺尾，開頭冇標記又計到超過 12 個鐘 → 開頭都當係 pm
-      if (!sm[1] && !sm[3] && sh < 12 && eh - sh > 12 &&
-          /下午|晚上|中午|傍晚|pm/i.test(String(sm[4] || '') + String(sm[6] || ''))) sh += 12;
-      session = { start: sh, end: eh };
+      const sess = parseTimeCore(sm);
+      session = sess;
       if (sm[7]){
         const toks = sm[7].split(/->|→|,|，|、|>|;|；/).map(x => x.trim()).filter(Boolean);
         toks.forEach((tk, idx) => {
@@ -266,8 +372,8 @@ function parseList(raw){
           const bname = (tk2 ? tk2[1] : tk).trim();
           if (!bname) return;
           const slot = tk2 ? +tk2[2] : (idx + 1);
-          const bs = sh + slot - 1;
-          if (bs >= sh && bs < eh){
+          const bs = sess.start + slot - 1;
+          if (bs >= sess.start && bs < sess.end){
             bookings.push({ name: bname, start: bs, end: bs + 1, hours: 1, court: '第' + slot + '鐘', priceOverride: null, srcLine: e.idx });
           } else {
             issues.push({level:'warn', msg:`「時間」嗰度嘅「${tk}」對唔返個時段，忽略咗。`});
@@ -460,6 +566,14 @@ function fmtMoney(n){
   return '$' + v.toFixed(1).replace(/\.0$/, '');
 }
 
+// 一場嘅時間標籤（19-21 → 「7-9」）
+function sessTime(bs){
+  if (!bs || !bs.length) return '';
+  const s = Math.min(...bs.map(b => b.start)), e = Math.max(...bs.map(b => b.end));
+  const f = h => h > 12 ? h - 12 : h;
+  return f(s) + '-' + f(e);
+}
+
 function compute(parsed, prices, shuttlePayer){
   const COURT = prices.court, SHUTTLE = prices.shuttle;
   const issues = parsed.issues.slice();
@@ -541,6 +655,7 @@ function compute(parsed, prices, shuttlePayer){
 
   return {
     bookings, everyone, issues,
+    sessions: [{ date: parsed.date, time: sessTime(bookings), fee: totalFee }],
     totals: { courtHours, courtFee, shuttlePH, shuttleFee, totalFee, totalPH, courtRate },
     balance: { collect, payBack, shuttleUnassigned },
     meta: { date: parsed.date, venue: parsed.venue, shuttlePayer: sp || null },
@@ -548,31 +663,23 @@ function compute(parsed, prices, shuttlePayer){
 }
 
 function buildWhatsAppText(r){
-  const t = r.totals, L = [];
-  const head = [r.meta.date, r.meta.venue].filter(Boolean).join('｜');
-  L.push('🏸【羽毛球數】' + head);
-  L.push(`場租 ${fmtMoney(t.courtFee)}（${t.courtHours} 場鐘，按打波鐘數分）`);
-  L.push(`波錢 ${fmtMoney(t.shuttleFee)}（每人每鐘計，共 ${t.shuttlePH} 個計波鐘）`);
-  L.push(`合共 ${fmtMoney(t.totalFee)}｜總共 ${t.totalPH} 個打波人頭鐘`);
-  if (r.lists > 1) L.push(`（${r.lists} 個清單一齊夾埋計）`);
-  const owe = r.everyone.filter(p => p.net < -0.001);
-  const back = r.everyone.filter(p => p.net > 0.001);
-  if (owe.length){
-    L.push('————————————');
-    L.push('👤 各位應付：');
-    for (const p of owe) L.push(`${p.name}（打${p.hours}hr·波${p.shuttleHours}hr）${fmtMoney(-p.net)}`);
+  const me = r.meta.shuttlePayer || 'Cathy'; // 收錢嗰個（波錢墊支人，預設 Cathy）
+  const L = ['🏸 羽毛球數'];
+  const sesss = (r.sessions && r.sessions.length)
+    ? r.sessions
+    : [{ date: r.meta.date, time: sessTime(r.bookings), fee: r.totals.totalFee }]; // 舊記錄後備
+  for (const s of sesss){
+    const d = (String(s.date || '').match(/^\d{1,2}[\/-]\d{1,2}/) || [''])[0];
+    L.push([d, s.time, fmtMoney(s.fee)].filter(Boolean).join(' '));
   }
+  L.push('-----------------');
+  const payers = r.everyone.filter(p => p.net < -0.001 && p.name !== me);
+  const back = r.everyone.filter(p => p.net > 0.001 && p.name !== me);
+  L.push(`${me} 收${fmtMoney(payers.reduce((a, p) => a - p.net, 0))}`);
+  for (const p of payers) L.push(`${p.name} 付${fmtMoney(-p.net)}`);
   if (back.length){
-    L.push('————————————');
-    L.push('💰 我會找返：');
-    for (const p of back) L.push(`${p.name} ${fmtMoney(p.net)}`);
-  }
-  if (r.balance.shuttleUnassigned > 0){
-    L.push('————————————');
-    L.push(`ℹ️ 波錢 ${fmtMoney(r.balance.shuttleUnassigned)} 未指明邊個墊支，我收齊後再同買波嗰位對返。`);
-  } else if (r.meta.shuttlePayer){
-    L.push('————————————');
-    L.push(`ℹ️ 波錢 ${fmtMoney(t.shuttleFee)} 由 ${r.meta.shuttlePayer} 墊支，已計埋喺條數度。`);
+    L.push('-----------------');
+    for (const p of back) L.push(`找返 ${p.name} ${fmtMoney(p.net)}`);
   }
   return L.join('\n');
 }
@@ -652,6 +759,7 @@ function computeMultiParsed(parsedSegs, prices, shuttlePayer){
   const sum = k => results.reduce((a, r) => a + r.totals[k], 0);
   return {
     bookings, everyone, issues, lists: results.length,
+    sessions: results.map((res, i) => ({ date: parsedSegs[i].date, time: sessTime(res.bookings), fee: res.totals.totalFee })),
     totals: {
       courtHours: sum('courtHours'), courtFee: sum('courtFee'),
       shuttlePH: sum('shuttlePH'), shuttleFee: sum('shuttleFee'),
@@ -780,6 +888,9 @@ function loadSettings(){
     if (s.aiModel) $('aiModel').value = s.aiModel;
     if (s.aiKey) $('aiKey').value = s.aiKey;
     if (s.lastInput) $('input').value = s.lastInput;
+    if (s.syncCode) $('syncCode').value = s.syncCode;
+    if (s.sbUrl) $('sbUrl').value = s.sbUrl;
+    if (s.sbKey) $('sbKey').value = s.sbKey;
   }catch(e){}
 }
 function saveSettings(){
@@ -788,8 +899,10 @@ function saveSettings(){
     shuttlePayer: $('shuttlePayer').value,
     aiBase: $('aiBase').value, aiModel: $('aiModel').value, aiKey: $('aiKey').value,
     lastInput: $('input').value,
+    syncCode: $('syncCode').value, sbUrl: $('sbUrl').value, sbKey: $('sbKey').value,
   };
   try{ localStorage.setItem(LS_KEY, JSON.stringify(s)); }catch(e){}
+  markDirty();
 }
 function aiCfg(){
   return { base: $('aiBase').value.trim(), model: $('aiModel').value.trim(), key: $('aiKey').value.trim() };
@@ -1018,9 +1131,411 @@ $('btnCopy').addEventListener('click', async () => {
     $('copyNote').textContent = '✅ 已複製（舊方法），去群組貼低佢啦！';
   }
 });
-['courtFee','shuttleFee','shuttlePayer','aiBase','aiModel','aiKey'].forEach(id =>
+['courtFee','shuttleFee','shuttlePayer','aiBase','aiModel','aiKey','syncCode','sbUrl','sbKey'].forEach(id =>
   $(id).addEventListener('change', saveSettings));
 $('input').addEventListener('blur', saveSettings);
+
+/* ---- 📝 填表模式：個表會砌返一份標準清單行返 runCalc 條路，記錄／改價／出數全部照用 ---- */
+
+const FORM_KEY = 'badmintonCounterForm';
+const formState = { roster: [], ticks: {}, times: {}, bookTicks: {}, bookCfg: {}, basket: [] };
+
+function bookCfgOf(n){
+  if (!formState.bookCfg[n]) formState.bookCfg[n] = { courts: 1, hours: [] };
+  return formState.bookCfg[n];
+}
+function loadForm(){
+  try{
+    const s = JSON.parse(localStorage.getItem(FORM_KEY) || '{}');
+    if (Array.isArray(s.roster)) formState.roster = s.roster.filter(x => typeof x === 'string' && x.trim());
+    formState.ticks = s.ticks || {};
+    formState.times = s.times || {};
+    formState.bookTicks = s.bookTicks || {};
+    if (s.bookCfg && typeof s.bookCfg === 'object'){
+      for (const k of Object.keys(s.bookCfg)){
+        const v = s.bookCfg[k] || {};
+        formState.bookCfg[k] = { courts: Math.max(1, Math.round(+v.courts) || 1), hours: Array.isArray(v.hours) ? v.hours : [] };
+      }
+    }
+    if (Array.isArray(s.basket)) formState.basket = s.basket.filter(x => typeof x === 'string' && x.trim());
+    if (s.time) $('fTime').value = s.time;
+  }catch(e){}
+  if (!$('fDate').value) $('fDate').value = new Date().toISOString().slice(0, 10);
+}
+function saveForm(){
+  const s = {
+    roster: formState.roster, ticks: formState.ticks, times: formState.times,
+    bookTicks: formState.bookTicks, bookCfg: formState.bookCfg, basket: formState.basket,
+    time: $('fTime').value,
+  };
+  try{ localStorage.setItem(FORM_KEY, JSON.stringify(s)); }catch(e){}
+  markDirty();
+}
+function formSlots(){
+  const tr = parseTimeRange($('fTime').value);
+  if (!tr || !(tr.end > tr.start)) return null;
+  const slots = [];
+  for (let h = tr.start; h < tr.end; h++) slots.push({ s: h, e: h + 1 });
+  return { tr, slots };
+}
+function renderRoster(){
+  const box = $('fRoster');
+  if (!formState.roster.length){
+    box.innerHTML = '<span class="hint">名單係空嘅 —— 喺下面打個名撳 Enter（例如 Red），下次 tick 返就得</span>';
+    return;
+  }
+  box.innerHTML = formState.roster.map(n => {
+    const on = formState.ticks[n] ? ' on' : '';
+    return `<span class="chipwrap${on}">`
+      + `<label class="chip"><input type="checkbox" class="pchk" data-name="${esc(n)}" ${formState.ticks[n] ? 'checked' : ''}>${esc(n)}<select class="psel" data-name="${esc(n)}" title="打邊段時間"></select></label>`
+      + `<button type="button" class="chipx" data-name="${esc(n)}" title="從名單刪除">✕</button>`
+      + `</span>`;
+  }).join('');
+  renderBookers();
+  renderRosterTimeOptions();
+}
+function renderBookers(){
+  const box = $('fBookers');
+  const fs = formSlots();
+  const bookers = formState.roster.filter(n => formState.bookTicks[n]);
+  let html = '';
+  if (!formState.roster.length){
+    html += '<span class="hint">名單係空嘅 —— 喺下面「有邊個打」度打個名撳 Enter，個人會喺埋呢度出現</span>';
+  } else {
+    html += '<div class="chips">'
+      + formState.roster.map(n => {
+          const on = formState.bookTicks[n] ? ' on' : '';
+          return `<span class="chipwrap${on}">`
+            + `<label class="chip"><input type="checkbox" class="b2chk" data-name="${esc(n)}" ${formState.bookTicks[n] ? 'checked' : ''}>${esc(n)}</label>`
+            + `</span>`;
+        }).join('')
+      + '</div>';
+  }
+  for (const b of bookers){
+    const cfg = bookCfgOf(b);
+    const ticks = fs
+      ? '<span class="hourTicks inline">' + fs.slots.map((sl, i) =>
+          `<label><input type="checkbox" class="bchk" data-name="${esc(b)}" data-i="${i}" ${cfg.hours[i] !== false ? 'checked' : ''}>${sl.s}-${sl.e}</label>`).join('') + '</span>'
+      : '<span class="hint">填咗上面「時間」先揀到鐘</span>';
+    html += `<div class="bkRow"><span class="bkName">${esc(b)}</span>`
+      + `<span class="hint">場數</span><input type="number" class="bkCourts" data-name="${esc(b)}" min="1" step="1" value="${cfg.courts}">`
+      + `<span class="hint">鐘數</span>${ticks}`
+      + `</div>`;
+  }
+  box.innerHTML = html;
+  renderRosterTimeOptions();
+}
+function renderRosterTimeOptions(){
+  const fs = formSlots();
+  const opts = [];
+  if (fs){
+    const { slots } = fs;
+    const seen = new Set();
+    const push = (s, e) => { const v = s + '-' + e; if (!seen.has(v)){ seen.add(v); opts.push({ v, t: (s === slots[0].s && e === slots[slots.length - 1].e ? '全部 ' : '') + v }); } };
+    push(slots[0].s, slots[slots.length - 1].e);
+    for (let i = 0; i < slots.length; i++)
+      for (let j = i + 1; j < slots.length; j++)
+        push(slots[i].s, slots[j].e);
+    for (const sl of slots) push(sl.s, sl.e);
+  }
+  document.querySelectorAll('#fRoster .psel').forEach(sel => {
+    const n = sel.dataset.name;
+    const cur = formState.times[n];
+    const val = opts.some(o => o.v === cur) ? cur : (opts[0] ? opts[0].v : '');
+    if (val) formState.times[n] = val;
+    sel.innerHTML = opts.map(o => `<option value="${o.v}" ${o.v === val ? 'selected' : ''}>${esc(o.t)}</option>`).join('');
+  });
+}
+function buildFormText(){
+  const d = $('fDate').value;
+  if (!d){ alert('揀咗日期先。'); return null; }
+  const fs = formSlots();
+  if (!fs){ alert('「時間」唔多對路 —— 照「下午7-9」「7-9pm」「7時-9時」咁樣填試下。'); return null; }
+  const bookers = formState.roster.filter(n => formState.bookTicks[n]);
+  if (!bookers.length){ alert('Tick 埋邊個 book 場先。'); return null; }
+  const played = formState.roster.filter(n => formState.ticks[n]);
+  if (!played.length){ alert('Tick 埋邊個打先（冇人打點計 😅）。'); return null; }
+
+  const [yy, mm, dd] = d.split('-').map(Number);
+  const wd = '日一二三四五六'[new Date(yy, mm - 1, dd).getDay()];
+  const L = [`日期：${dd}/${mm}/${yy} (${wd})`, '時間：' + normLine($('fTime').value).trim()];
+
+  // 每個 booker 自己嘅場數＋鐘數：鐘 tick 齊晒 → 短寫法；唔齊 → 每段連續鐘一行（每個場一行）
+  let courtNo = 0;
+  for (const b of bookers){
+    const cfg = bookCfgOf(b);
+    const courts = Math.max(1, Math.round(+cfg.courts) || 1);
+    const onFlags = fs.slots.map((_, i) => cfg.hours[i] !== false);
+    if (!onFlags.some(Boolean)){ alert(`「${b}」book 嘅鐘數起碼 tick 一個。`); return null; }
+    const cs = [];
+    for (let k = 0; k < courts; k++) cs.push(++courtNo);
+    const ranges = [];
+    let cur = null;
+    fs.slots.forEach((sl, i) => {
+      if (onFlags[i]) cur = cur ? { s: cur.s, e: sl.e } : { s: sl.s, e: sl.e };
+      else if (cur){ ranges.push(cur); cur = null; }
+    });
+    if (cur) ranges.push(cur);
+    if (ranges.length === 1 && ranges[0].s === fs.tr.start && ranges[0].e === fs.tr.end){
+      L.push(`場地：${b}#${cs.join('、')}`);
+    } else {
+      for (const r of ranges) for (const c of cs) L.push(`${b} ${r.s}-${r.e}#${c}`);
+    }
+  }
+
+  L.push('------------');
+  const fullV = fs.tr.start + '-' + fs.tr.end;
+  played.forEach((n, i) => {
+    const tm = formState.times[n];
+    L.push(`${i + 1}.${n}` + (tm && tm !== fullV ? ` (${tm})` : ''));
+  });
+  return L.join('\n');
+}
+$('btnFormCalc').addEventListener('click', () => {
+  const text = buildFormText();
+  if (!text) return;
+  $('input').value = text;
+  saveSettings();
+  runCalc(false);
+});
+$('btnFormAll').addEventListener('click', () => {
+  formState.roster.forEach(n => formState.ticks[n] = true);
+  renderRoster(); saveForm();
+});
+$('btnFormReset').addEventListener('click', () => {
+  formState.roster.forEach(n => { formState.ticks[n] = false; formState.bookTicks[n] = false; });
+  formState.bookCfg = {};
+  renderRoster(); saveForm();
+});
+
+/* ---- 📊 批（幾日一齊結數）：每日照個表砌清單存落 basket，齊咗一次過夾埋計 ---- */
+
+function renderBasket(){
+  const box = $('basketBox');
+  if (!formState.basket.length){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  $('basketLbl').textContent = `📊 今批入面有 ${formState.basket.length} 日（結完數撳「🧹 清返個批」）：`;
+  $('basketList').innerHTML = formState.basket.map((t, i) => {
+    const dm = t.match(/^日期：(.+)$/m);
+    const pm = (t.match(/^\d+\.\S/gm) || []).length;
+    return `<span class="chipwrap on">`
+      + `<span class="chip" style="cursor:default">${esc(dm ? dm[1] : '第' + (i + 1) + '日')} · ${pm}人</span>`
+      + `<button type="button" class="basketx" data-i="${i}" title="撤走呢日">✕</button>`
+      + `</span>`;
+  }).join('');
+}
+$('btnAddBasket').addEventListener('click', () => {
+  const text = buildFormText();
+  if (!text) return;
+  formState.basket.push(text);
+  saveForm(); renderBasket();
+});
+$('btnCalcBatch').addEventListener('click', () => {
+  if (!formState.basket.length){ alert('個批仲係空 —— 撳「➕ 加落呢批」加咗啲日子先。'); return; }
+  $('input').value = formState.basket.join('\n=====\n');
+  saveSettings();
+  runCalc(false);
+});
+$('btnClearBasket').addEventListener('click', () => {
+  if (!formState.basket.length) return;
+  if (confirm('清走成個批？（名單同已存嘅記錄唔會受影響）')){
+    formState.basket = [];
+    saveForm(); renderBasket();
+  }
+});
+$('formCard').addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.classList.contains('pchk')){
+    formState.ticks[t.dataset.name] = t.checked;
+    const w = t.closest('.chipwrap');
+    if (w) w.classList.toggle('on', t.checked);
+    saveForm();
+  } else if (t.classList.contains('psel')){
+    formState.times[t.dataset.name] = t.value;
+    saveForm();
+  } else if (t.classList.contains('bchk')){
+    bookCfgOf(t.dataset.name).hours[+t.dataset.i] = t.checked;
+    saveForm();
+  } else if (t.classList.contains('bkCourts')){
+    const v = Math.max(1, Math.round(+t.value) || 1);
+    bookCfgOf(t.dataset.name).courts = v;
+    t.value = v;
+    saveForm();
+  } else if (t.classList.contains('b2chk')){
+    formState.bookTicks[t.dataset.name] = t.checked;
+    saveForm();
+    renderBookers(); // tick 咗先會出現嗰個人嘅「場數＋鐘數」行
+  }
+});
+$('formCard').addEventListener('click', ev => {
+  const bx = ev.target.closest('.basketx');
+  if (bx){
+    formState.basket.splice(+bx.dataset.i, 1);
+    saveForm(); renderBasket();
+    return;
+  }
+  const x = ev.target.closest('.chipx');
+  if (!x) return;
+  const n = x.dataset.name;
+  formState.roster = formState.roster.filter(y => y !== n);
+  delete formState.ticks[n];
+  delete formState.times[n];
+  delete formState.bookTicks[n];
+  delete formState.bookCfg[n];
+  renderRoster(); saveForm();
+});
+$('fNewName').addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  const n = $('fNewName').value.trim();
+  if (!n) return;
+  if (!formState.roster.includes(n)) formState.roster.push(n);
+  formState.ticks[n] = true;
+  $('fNewName').value = '';
+  renderRoster(); saveForm();
+});
+$('fTime').addEventListener('input', saveForm);
+$('fTime').addEventListener('input', renderBookers);
+
+/* ---- ☁️ 跨機同步（Supabase；三格未填齊就完全唔上網）----
+   打包／套用同一套 bundle，匯出備份都用佢。兩邊有改動 → 上次改嗰部機為準（last-write-wins）。 */
+
+function syncCfg(){
+  return { code: $('syncCode').value.trim(), url: $('sbUrl').value.trim().replace(/\/+$/, ''), key: $('sbKey').value.trim() };
+}
+function buildBundle(){
+  return {
+    type: 'badmintonBackup', version: 2, exportedAt: new Date().toISOString(),
+    roster: formState.roster,
+    form: {
+      ticks: formState.ticks, times: formState.times,
+      bookTicks: formState.bookTicks, bookCfg: formState.bookCfg,
+      basket: formState.basket,
+      time: $('fTime').value,
+    },
+    settings: {
+      courtFee: $('courtFee').value, shuttleFee: $('shuttleFee').value, shuttlePayer: $('shuttlePayer').value,
+    },
+    history: loadHist(),
+  };
+}
+function applyBundle(b){
+  if (Array.isArray(b.roster)){
+    formState.roster = [...new Set(formState.roster.concat(b.roster.filter(x => typeof x === 'string' && x.trim())))];
+  }
+  if (b.form){
+    Object.assign(formState.ticks, b.form.ticks || {});
+    Object.assign(formState.times, b.form.times || {});
+    if (b.form.bookTicks && !Array.isArray(b.form.bookTicks)) Object.assign(formState.bookTicks, b.form.bookTicks);
+    if (b.form.bookCfg && typeof b.form.bookCfg === 'object'){
+      for (const k of Object.keys(b.form.bookCfg)){
+        const v = b.form.bookCfg[k] || {};
+        formState.bookCfg[k] = { courts: Math.max(1, Math.round(+v.courts) || 1), hours: Array.isArray(v.hours) ? v.hours : [] };
+      }
+    }
+    if (Array.isArray(b.form.basket)) formState.basket = b.form.basket.filter(x => typeof x === 'string' && x.trim());
+    if (b.form.time) $('fTime').value = b.form.time;
+  }
+  if (b.settings){
+    if (b.settings.courtFee != null) $('courtFee').value = b.settings.courtFee;
+    if (b.settings.shuttleFee != null) $('shuttleFee').value = b.settings.shuttleFee;
+    if (b.settings.shuttlePayer != null) $('shuttlePayer').value = b.settings.shuttlePayer;
+  }
+  renderRoster(); renderBasket(); saveForm(); saveSettings();
+  if (Array.isArray(b.history) && b.history.length){
+    const list = loadHist();
+    for (const r of b.history){
+      if (!r || !r.result || !r.raw) continue;
+      const i = list.findIndex(x => x.raw === r.raw);
+      if (i >= 0){ if ((r.id || 0) >= (list[i].id || 0)) list[i] = r; }
+      else list.push(r);
+    }
+    list.sort((a, b2) => (b2.id || 0) - (a.id || 0));
+    saveHistList(list); renderHist();
+  }
+}
+const SYNC_T_KEY = 'badmintonCounterSyncTs';
+function syncTs(){
+  try{ const t = JSON.parse(localStorage.getItem(SYNC_T_KEY) || '{}'); return (t && typeof t === 'object') ? t : {}; }
+  catch(e){ return {}; }
+}
+function setSyncTs(o){ try{ localStorage.setItem(SYNC_T_KEY, JSON.stringify(o)); }catch(e){} }
+function markDirty(){
+  const t = syncTs(); t.dirtyAt = Date.now(); setSyncTs(t);
+  scheduleSync();
+}
+let syncTimer = null;
+function scheduleSync(){
+  const c = syncCfg();
+  if (!c.code || !c.url || !c.key) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => doSync(false), 3000);
+}
+async function sbFetch(path, opts){
+  const c = syncCfg();
+  const res = await fetch(c.url + path, Object.assign({}, opts, {
+    headers: Object.assign(
+      { 'apikey': c.key, 'Authorization': 'Bearer ' + c.key, 'Content-Type': 'application/json' },
+      (opts && opts.headers) || {}),
+  }));
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 120));
+  return res;
+}
+async function doSync(manual){
+  const c = syncCfg();
+  if (!c.code || !c.url || !c.key){
+    if (manual) alert('填齊「同步碼」、「Supabase URL」同「anon key」先（喺 ☁️ 跨機同步入面）。');
+    return;
+  }
+  const t = syncTs();
+  const isDirty = tt => tt.dirtyAt && (!tt.pushedAt || tt.dirtyAt > tt.pushedAt);
+  let remote = null;
+  try{
+    const res = await sbFetch('/rest/v1/bm_state?code=eq.' + encodeURIComponent(c.code) + '&select=data,updated_at', { method: 'GET' });
+    const arr = await res.json();
+    remote = (Array.isArray(arr) && arr[0]) ? arr[0] : null;
+  }catch(err){
+    note('❌ 讀唔到：' + err.message);
+    if (manual) alert('同步失敗（讀唔到雲端）：' + err.message);
+    return;
+  }
+  const remoteMs = remote ? (Date.parse(remote.updated_at) || 0) : 0;
+  // 新裝置／啱啱清空：本地冇名單冇記錄，而雲端有 → 一律攞落嚟，唔准推空嘢上去蓋人
+  const rd = remote && remote.data ? remote.data : null;
+  const remoteHasData = rd && ((Array.isArray(rd.roster) && rd.roster.length) || (Array.isArray(rd.history) && rd.history.length));
+  if (remoteHasData && !formState.roster.length && !loadHist().length){
+    try{ applyBundle(rd); }catch(err){ note('❌ 套用失敗：' + err.message); return; }
+    setSyncTs({ pushedAt: Date.now(), dirtyAt: Date.now() });
+    note('☁️ 已攞咗雲端資料落嚟（' + new Date().toLocaleTimeString() + '）');
+    return;
+  }
+  if (remote && remoteMs > (t.pushedAt || 0) && (!isDirty(t) || remoteMs > t.dirtyAt)){
+    // 另一部機有較新嘅版本 → 攞佢過嚟
+    try{ applyBundle(remote.data); }catch(err){ note('❌ 套用失敗：' + err.message); return; }
+    setSyncTs({ pushedAt: Date.now(), dirtyAt: Date.now() });
+    note('☁️ 已攞咗另一部機嘅最新資料（' + new Date().toLocaleTimeString() + '）');
+    return;
+  }
+  if (isDirty(t) || !remote){
+    const now = new Date().toISOString();
+    try{
+      await sbFetch('/rest/v1/bm_state?on_conflict=code', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates' },
+        body: JSON.stringify({ code: c.code, data: buildBundle(), updated_at: now }),
+      });
+      setSyncTs({ pushedAt: Date.now(), dirtyAt: Date.now() });
+      note('☁️ 已同步上雲端（' + new Date().toLocaleTimeString() + '）');
+    }catch(err){
+      note('❌ 寫唔到：' + err.message);
+      if (manual) alert('同步失敗（寫唔到雲端）：' + err.message);
+    }
+  } else {
+    note('☁️ 已係最新（' + new Date().toLocaleTimeString() + '）');
+  }
+}
+function note(s){ const el = $('syncNote'); if (el) el.textContent = s; }
+$('btnSync').addEventListener('click', () => doSync(true));
 
 function refreshAIBtn(){
   const c = aiCfg();
@@ -1038,6 +1553,7 @@ function loadHist(){
 }
 function saveHistList(list){
   try{ localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 100))); }catch(e){}
+  markDirty();
 }
 function addRecord(raw, result, paidMap){
   if (!raw || !result) return null;
@@ -1070,10 +1586,11 @@ function renderHist(){
     return n >= payers.length ? '✅ 收齊' : '已收 ' + n + '/' + payers.length;
   };
   $('histTable').innerHTML =
-    '<tr><th>日期</th><th>地點</th><th class="num">總數</th><th class="num">你收</th><th class="num">你找返</th><th>收數</th><th></th></tr>'
+    '<tr><th>🔗</th><th>日期</th><th>地點</th><th class="num">總數</th><th class="num">你收</th><th class="num">你找返</th><th>收數</th><th></th></tr>'
     + list.map(r => {
         const st = payState(r);
         return `<tr class="histRow" data-id="${r.id}"${st === '✅ 收齊' ? ' style="background:#f0fdf4"' : ''}>`
+        + `<td><input type="checkbox" class="mrgChk paidChk-ignore" data-id="${r.id}" title="揀嚟合併結算" style="accent-color:#7c3aed"></td>`
         + `<td>${esc(r.date || r.ts.slice(0, 10))}</td><td>${esc(r.venue || '—')}</td>`
         + `<td class="num">${fmtMoney(r.totalFee)}</td><td class="num">${fmtMoney(r.collect)}</td><td class="num">${fmtMoney(r.payBack)}</td>`
         + `<td>${st}</td>`
@@ -1082,6 +1599,7 @@ function renderHist(){
 }
 
 $('histTable').addEventListener('click', ev => {
+  if (ev.target.classList && ev.target.classList.contains('mrgChk')) return; // 揀合併嗰下唔好載入記錄
   const del = ev.target.closest('.delBtn');
   if (del){
     saveHistList(loadHist().filter(r => r.id !== +del.dataset.id));
@@ -1129,11 +1647,11 @@ function persistPaid(){
 
 $('btnExport').addEventListener('click', () => {
   const list = loadHist();
-  if (!list.length){ alert('仲未有記錄可以匯出。'); return; }
-  const blob = new Blob([JSON.stringify(list)], { type: 'application/json' });
+  if (!list.length && !formState.roster.length){ alert('仲未有嘢可以匯出。'); return; }
+  const blob = new Blob([JSON.stringify(buildBundle())], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'badminton-records-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = 'badminton-backup-' + new Date().toISOString().slice(0, 10) + '.json';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 });
@@ -1144,18 +1662,25 @@ $('importFile').addEventListener('change', ev => {
   const rd = new FileReader();
   rd.onload = () => {
     try{
-      const arr = JSON.parse(rd.result);
-      if (!Array.isArray(arr)) throw new Error('唔係記錄格式');
-      const list = loadHist();
-      for (const r of arr){
-        if (!r || !r.result || !r.raw) continue;
-        const i = list.findIndex(x => x.raw === r.raw);
-        if (i >= 0) list.splice(i, 1);
-        list.push(r);
+      const parsed = JSON.parse(rd.result);
+      if (Array.isArray(parsed)){
+        // 舊格式備份：淨係記錄
+        const list = loadHist();
+        for (const r of parsed){
+          if (!r || !r.result || !r.raw) continue;
+          const i = list.findIndex(x => x.raw === r.raw);
+          if (i >= 0) list.splice(i, 1);
+          list.push(r);
+        }
+        list.sort((a, b) => (b.id || 0) - (a.id || 0));
+        saveHistList(list); renderHist();
+        alert('匯入完成（舊格式備份，淨係記錄），而家總共 ' + list.length + ' 條記錄。');
+      } else if (parsed && parsed.type === 'badmintonBackup'){
+        applyBundle(parsed);
+        alert('匯入完成：名單、設定同 ' + loadHist().length + ' 條記錄都已經加入呢部機。');
+      } else {
+        throw new Error('唔係備份格式');
       }
-      list.sort((a, b) => (b.id || 0) - (a.id || 0));
-      saveHistList(list); renderHist();
-      alert('匯入完成，而家總共 ' + list.length + ' 條記錄。');
     }catch(e){
       alert('呢個檔讀唔到 —— 確認係「匯出備份」落地嘅 JSON 檔？');
     }
@@ -1169,9 +1694,26 @@ $('btnClearHist').addEventListener('click', () => {
   }
 });
 
+/* ---- 🔗 合併結算：揀幾單已計嘅記錄，一次過夾埋出一條總數 ---- */
+
+$('btnMergeHist').addEventListener('click', () => {
+  const ids = [...document.querySelectorAll('.mrgChk:checked')].map(c => +c.dataset.id);
+  if (ids.length < 2){ alert('喺記錄最左手邊 🔗 嗰格 tick 兩單或以上，再撳「🔗 合併結算」。'); return; }
+  const recs = loadHist().filter(r => ids.includes(r.id)).reverse(); // 舊嘅排先
+  const raws = recs.map(r => r.raw);
+  if (raws.some(r => !r)){ alert('有啲揀咗嘅記錄冇咗個清單，合併唔到。'); return; }
+  $('input').value = raws.join('\n=====\n');
+  saveSettings();
+  runCalc(false);
+});
+
+loadForm();
+renderRoster();
+renderBasket();
 loadSettings();
 refreshAIBtn();
 renderHist();
+doSync(false); // 有填齊 ☁️ 同步設定嘅話，開頁自動攞最新（否則甚麼都不做）
 }
 </script>
 </body>
