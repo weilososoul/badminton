@@ -57,6 +57,7 @@
   th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
   th{background:#f0fdf9;color:var(--teal-dark);font-size:.85em}
   .feeInput{width:80px;padding:3px 6px;border:1px dashed #f59e0b;border-radius:6px;font:inherit;font-size:.92em;text-align:right;background:#fffbeb;color:#92400e}
+  .shuttleInput{width:80px;padding:3px 6px;border:1px dashed #2dd4bf;border-radius:6px;font:inherit;font-size:.92em;text-align:right;background:#f0fdf9;color:var(--teal-dark)}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   .pos{color:var(--ok);font-weight:700}
   .neg{color:var(--bad);font-weight:700}
@@ -97,7 +98,7 @@
 <div class="wrap">
   <header>
     <h1>🏸 羽毛球計數器</h1>
-    <p>貼個清單落去，自動計出每人應付 / 應收。</p>
+    <p>貼個清單落去，自動計出每人應付 / 應收。 <span style="color:#b6c5c1;font-size:.85em">· 版本 23Oct-C</span></p>
   </header>
 
   <div class="card" id="formCard">
@@ -167,7 +168,7 @@
           <input type="number" id="courtFee" min="0" step="0.5" value="59">
         </div>
         <div>
-          <label for="shuttleFee">波錢（每人每鐘 $，只計普通場嘅鐘）</label>
+          <label for="shuttleFee">波錢每鐘（預設 $/鐘；個別場可以喺「場地明細」改成 0＝唔計或者自訂）</label>
           <input type="number" id="shuttleFee" min="0" step="0.5" value="15">
         </div>
         <div>
@@ -391,6 +392,13 @@ function parseList(raw){
     let workLine = l, venuePrefix = false;
     const vm = l.match(/^[場埸]地\s*[:：]\s*(.+)$/);
     if (vm){ workLine = vm[1].trim(); venuePrefix = true; }
+    // 波錢率（可選，要先過 $ 拆，唔係會俾佢食咗個數）：「波12」「波$12」= 嗰個 book 場每鐘波錢；0 = 唔計
+    let shuttleRate = null;
+    const shm = workLine.match(/波\s*\$?\s*(\d+(?:\.\d+)?)/);
+    if (shm){
+      shuttleRate = parseFloat(shm[1]);
+      workLine = (workLine.slice(0, shm.index) + ' ' + workLine.slice(shm.index + shm[0].length)).replace(/\s{2,}/g, ' ').trim();
+    }
     // 特別價：行內有 $XXX 就當成呢個 book 場嘅總數、包埋波錢（例如「禮 8-10#6轉3 $360」）
     let priceOverride = null, body = workLine;
     const pm = workLine.match(/[$＄]\s*(\d+(?:\.\d+)?)/);
@@ -403,7 +411,7 @@ function parseList(raw){
       const start = +m[2], end = +m[3];
       const name = m[1].replace(/[:：]\s*$/, '').trim();
       if (end <= start){ issues.push({level:'warn', msg:`「${l}」個時間 ${start}-${end} 唔合理，跳過咗。`}); continue; }
-      bookings.push({ name, start, end, hours: end - start, court: m[4].trim(), priceOverride, srcLine: e.idx });
+      bookings.push({ name, start, end, hours: end - start, court: m[4].trim(), priceOverride, shuttleRate, srcLine: e.idx });
       continue;
     }
     // 冇時間嘅 book 場：用「時間」嗰行嘅時段。有 # 嘅一段 =「名#場號(、場號)」；一段冇 # = 嗰個人 book 一個場
@@ -417,7 +425,7 @@ function parseList(raw){
         ok = true;
         if (priceOverride != null && courts.length > 1)
           issues.push({level:'warn', msg:`「${l}」嘅 $${priceOverride} 會當做每個場嘅價；如果係幾個場夾埋嘅總數，記得喺「場地明細」手動改返。`});
-        courts.forEach(c => bookings.push({ name: bname, start: session.start, end: session.end, hours: session.end - session.start, court: c, priceOverride, srcLine: e.idx }));
+        courts.forEach(c => bookings.push({ name: bname, start: session.start, end: session.end, hours: session.end - session.start, court: c, priceOverride, shuttleRate, srcLine: e.idx }));
       }
       if (ok) continue;
     }
@@ -580,15 +588,18 @@ function compute(parsed, prices, shuttlePayer){
   const bookings = parsed.bookings.map(b => Object.assign({}, b, {
     courtFee: (b.priceOverride != null ? b.priceOverride : b.hours * COURT),
     overridden: b.priceOverride != null,
+    shuttleRate: (b.shuttleRate != null && !isNaN(+b.shuttleRate)) ? +b.shuttleRate : SHUTTLE,
   }));
 
   const courtHours = bookings.reduce((a, b) => a + b.hours, 0);
   const courtFee = bookings.reduce((a, b) => a + b.courtFee, 0);
-  // 波錢窗口：普通場（冇特別價）開緊嘅鐘，先至要計波錢；特別價場包埋波錢
-  const shuttleWindow = new Set();
+  // 每個 book 堰可以有自己嘅波錢率（預設＝設定嗰個；0＝唔計；特別價場已包唔另計）。
+  // 同一個鐘有幾個場開緊，取最貴嗰個率（打波嗰個人嗰個鐘就計嗰個價）。
+  const shuttleRateByHour = new Map();
   for (const b of bookings){
     if (b.priceOverride != null) continue;
-    for (let h = Math.floor(b.start); h < b.end; h++) shuttleWindow.add(h);
+    const rate = Math.max(0, b.shuttleRate);
+    for (let h = Math.floor(b.start); h < b.end; h++) shuttleRateByHour.set(h, Math.max(shuttleRateByHour.get(h) || 0, rate));
   }
 
   const people = new Map();
@@ -602,13 +613,15 @@ function compute(parsed, prices, shuttlePayer){
     q.start = p.start; q.end = p.end;
     q.timeLabel = q.timeLabel ? q.timeLabel + '+' : `${p.start}-${p.end}`;
   }
-  // 每人波錢：每鐘 $SHUTTLE × 佢打嘅鐘入面有幾多個鐘係普通場開緊（特別價場包埋波錢，唔計）
+  // 每人波錢：打緊嘅每個鐘 × 嗰個鐘嘅波錢率（0 率／已包嘅鐘唔計）
   let shuttlePH = 0;
   for (const p of people.values()){
     p.shuttleHours = 0; p.shuttleFee = 0;
     if (!p.played) continue;
-    for (let h = Math.floor(p.start); h < p.end; h++) if (shuttleWindow.has(h)) p.shuttleHours++;
-    p.shuttleFee = p.shuttleHours * SHUTTLE;
+    for (let h = Math.floor(p.start); h < p.end; h++){
+      const rate = shuttleRateByHour.get(h);
+      if (rate != null && rate > 0){ p.shuttleHours++; p.shuttleFee += rate; }
+    }
     shuttlePH += p.shuttleHours;
   }
   const shuttleFee = [...people.values()].reduce((a, p) => a + p.shuttleFee, 0);
@@ -663,23 +676,25 @@ function compute(parsed, prices, shuttlePayer){
 }
 
 function buildWhatsAppText(r){
-  const me = r.meta.shuttlePayer || 'Cathy'; // 收錢嗰個（波錢墊支人，預設 Cathy）
   const L = ['🏸 羽毛球數'];
   const sesss = (r.sessions && r.sessions.length)
     ? r.sessions
-    : [{ date: r.meta.date, time: sessTime(r.bookings), fee: r.totals.totalFee }]; // 舊記錄後備
+    : [{ date: r.meta.date, time: sessTime(r.bookings) }]; // 舊記錄後備
   for (const s of sesss){
     const d = (String(s.date || '').match(/^\d{1,2}[\/-]\d{1,2}/) || [''])[0];
-    L.push([d, s.time, fmtMoney(s.fee)].filter(Boolean).join(' '));
+    L.push([d, s.time].filter(Boolean).join(' '));
   }
   L.push('-----------------');
-  const payers = r.everyone.filter(p => p.net < -0.001 && p.name !== me);
-  const back = r.everyone.filter(p => p.net > 0.001 && p.name !== me);
-  L.push(`${me} 收${fmtMoney(payers.reduce((a, p) => a - p.net, 0))}`);
-  for (const p of payers) L.push(`${p.name} 付${fmtMoney(-p.net)}`);
-  if (back.length){
-    L.push('-----------------');
-    for (const p of back) L.push(`找返 ${p.name} ${fmtMoney(p.net)}`);
+  const payers = r.everyone.filter(p => p.net < -0.001);
+  const getters = r.everyone.filter(p => p.net > 0.001);
+  if (payers.length){
+    L.push('付:');
+    for (const p of payers) L.push(`${p.name} ${fmtMoney(-p.net)}`);
+  }
+  if (getters.length){
+    L.push('');
+    L.push('收:');
+    for (const p of getters) L.push(`${p.name} ${fmtMoney(p.net)}`);
   }
   return L.join('\n');
 }
@@ -951,15 +966,16 @@ function render(parsed, result, source, doScroll){
 
   const multi = (result.lists || 1) > 1;
   $('bookTable').innerHTML =
-    '<tr>' + (multi ? '<th class="num">#</th>' : '') + '<th>Book場人</th><th class="num">時間</th><th>場</th><th class="num">鐘數</th><th class="num">場租 ✏️</th><th class="num">波錢</th></tr>'
+    '<tr>' + (multi ? '<th class="num">#</th>' : '') + '<th>Book場人</th><th class="num">時間</th><th>場</th><th class="num">鐘數</th><th class="num">場租 ✏️</th><th class="num">波錢/鐘 ✏️</th></tr>'
     + result.bookings.map((b, i) =>
       `<tr${b.overridden ? ' style="background:#fff7ed"' : ''}>${multi ? `<td class="num">${b.seg != null ? b.seg : ''}</td>` : ''}<td>${esc(b.name)}</td><td class="num">${b.start}-${b.end}</td><td>${esc(b.court)}</td>`
-      + `<td class="num">${b.hours}</td><td class="num"><input type="number" step="0.5" min="0" class="feeInput" data-i="${i}" data-line="${b.srcLine != null ? b.srcLine : -1}" value="${+b.courtFee.toFixed(1)}" title="呢個場嘅總數（包埋波錢），可以改成特別價"></td><td class="num">${b.overridden ? '<span class="zero">已包</span>' : '計波'}</td></tr>`
+      + `<td class="num">${b.hours}</td><td class="num"><input type="number" step="0.5" min="0" class="feeInput" data-i="${i}" data-line="${b.srcLine != null ? b.srcLine : -1}" value="${+b.courtFee.toFixed(1)}" title="呢個場嘅總數（包埋波錢），可以改成特別價"></td>`
+      + `<td class="num">${b.overridden ? '<span class="zero">已包</span>' : `<input type="number" step="0.5" min="0" class="shuttleInput" data-i="${i}" data-line="${b.srcLine != null ? b.srcLine : -1}" value="${b.shuttleRate}" title="波錢每鐘 $（0＝唔計）">`}</td></tr>`
     ).join('');
 
   const paidMap = (currentCtx && currentCtx.paidMap) || {};
   $('peopleTable').innerHTML =
-    '<tr><th>名</th><th class="num">時間</th><th class="num">打鐘</th><th class="num">波鐘</th><th class="num">應付</th><th class="num">墊支</th><th>淨數</th><th>搞掂 ✓</th></tr>'
+    '<tr><th>名</th><th class="num">打鐘</th><th class="num">波鐘</th><th class="num">應付</th><th class="num">墊支</th><th>淨數</th><th>搞掂 ✓</th></tr>'
     + result.everyone.map(p => {
         let cls = 'zero', txt = '平';
         if (p.net > 0.001){ cls = 'pos'; txt = '你找返佢 ' + fmtMoney(p.net); }
@@ -968,7 +984,7 @@ function render(parsed, result, source, doScroll){
         const chk = need
           ? `<input type="checkbox" class="paidChk" data-name="${esc(p.name)}" ${paidMap[p.name] ? 'checked' : ''} title="${p.net < 0 ? '已收佢錢' : '已找返錢俾佢'}">`
           : '—';
-        return `<tr><td>${esc(p.name)}</td><td class="num">${esc(p.timeLabel || '—')}</td>`
+        return `<tr><td>${esc(p.name)}</td>`
           + `<td class="num">${p.played ? p.hours : '—'}</td><td class="num">${p.played ? p.shuttleHours : '—'}</td><td class="num">${fmtMoney(p.share)}</td>`
           + `<td class="num">${p.fronted ? fmtMoney(p.fronted) : '—'}</td><td class="${cls}">${txt}</td><td>${chk}</td></tr>`;
       }).join('');
@@ -1086,26 +1102,31 @@ $('btnClear').addEventListener('click', () => { $('input').value = ''; $('result
 
 // 場地明細改特別價 → 即刻重計，並且寫返落清單度（下次重計都keep住）
 $('bookTable').addEventListener('keydown', ev => {
-  if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('feeInput')){
+  if (ev.key === 'Enter' && ev.target.classList && (ev.target.classList.contains('feeInput') || ev.target.classList.contains('shuttleInput'))){
     ev.preventDefault();
     ev.target.blur();
   }
 });
 $('bookTable').addEventListener('change', ev => {
   const inp = ev.target;
-  if (!inp.classList || !inp.classList.contains('feeInput') || !currentCtx) return;
+  if (!inp.classList || !(inp.classList.contains('feeInput') || inp.classList.contains('shuttleInput')) || !currentCtx) return;
   if (!currentCtx.parsed && !currentCtx.recompute) return; // 舊記錄唔比改價
   const i = +inp.dataset.i;
   const b = currentCtx.parsed && currentCtx.parsed.bookings[i];
   if (!b) return;
   const v = parseFloat(inp.value);
-  b.priceOverride = isNaN(v) ? null : v;
+  if (inp.classList.contains('feeInput')){
+    b.priceOverride = isNaN(v) ? null : v;
+  } else {
+    b.shuttleRate = isNaN(v) ? null : v;
+  }
   if (b.srcLine != null && b.srcLine >= 0){
     const ta = $('input');
     const arr = ta.value.split(/\r?\n/);
     if (arr[b.srcLine] != null && arr[b.srcLine].trim() !== ''){
       const priceTag = b.priceOverride != null ? ' $' + (+b.priceOverride.toFixed(1)) : '';
-      arr[b.srcLine] = `${b.name} ${b.start}-${b.end}#${b.court}${priceTag}`;
+      const shuttleTag = b.shuttleRate != null ? ' 波$' + (+b.shuttleRate.toFixed(1)) : '';
+      arr[b.srcLine] = `${b.name} ${b.start}-${b.end}#${b.court}${priceTag}${shuttleTag}`;
       ta.value = arr.join('\n');
     }
   }
@@ -1403,6 +1424,26 @@ $('fTime').addEventListener('input', renderBookers);
 function syncCfg(){
   return { code: $('syncCode').value.trim(), url: $('sbUrl').value.trim().replace(/\/+$/, ''), key: $('sbKey').value.trim() };
 }
+const TOMB_KEY = 'badmintonCounterTomb';
+function loadTomb(){
+  try{ const a = JSON.parse(localStorage.getItem(TOMB_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'number') : []; }
+  catch(e){ return []; }
+}
+function saveTomb(a){ try{ localStorage.setItem(TOMB_KEY, JSON.stringify(a.slice(-500))); }catch(e){} }
+function addTombIds(ids){
+  ids = ids.filter(x => typeof x === 'number');
+  if (!ids.length) return;
+  const t = loadTomb();
+  ids.forEach(id => { if (!t.includes(id)) t.push(id); });
+  saveTomb(t); markDirty();
+}
+function mergeTomb(ids){
+  if (!Array.isArray(ids) || !ids.length) return;
+  const t = loadTomb();
+  let changed = false;
+  ids.forEach(id => { if (typeof id === 'number' && !t.includes(id)){ t.push(id); changed = true; } });
+  if (changed) saveTomb(t);
+}
 function buildBundle(){
   return {
     type: 'badmintonBackup', version: 2, exportedAt: new Date().toISOString(),
@@ -1417,6 +1458,7 @@ function buildBundle(){
       courtFee: $('courtFee').value, shuttleFee: $('shuttleFee').value, shuttlePayer: $('shuttlePayer').value,
     },
     history: loadHist(),
+    tomb: loadTomb(),
   };
 }
 function applyBundle(b){
@@ -1443,15 +1485,51 @@ function applyBundle(b){
   }
   renderRoster(); renderBasket(); saveForm(); saveSettings();
   if (Array.isArray(b.history) && b.history.length){
+    mergeTomb(b.tomb);
+    const tomb = loadTomb();
     const list = loadHist();
+    let changed = false;
     for (const r of b.history){
-      if (!r || !r.result || !r.raw) continue;
+      if (!r || !r.result || !r.raw || tomb.includes(r.id)) continue;
       const i = list.findIndex(x => x.raw === r.raw);
-      if (i >= 0){ if ((r.id || 0) >= (list[i].id || 0)) list[i] = r; }
-      else list.push(r);
+      if (i >= 0){
+        const same = list[i].id === r.id && JSON.stringify(list[i].paid || {}) === JSON.stringify(r.paid || {});
+        if (!same && (r.id || 0) >= (list[i].id || 0)){ list[i] = r; changed = true; }
+      }
+      else { list.push(r); changed = true; }
     }
-    list.sort((a, b2) => (b2.id || 0) - (a.id || 0));
-    saveHistList(list); renderHist();
+    if (changed){
+      list.sort((a, b2) => (b2.id || 0) - (a.id || 0));
+      saveHistList(list); renderHist();
+    }
+  }
+}
+// 同步用嘅輕量合併：記錄＋名單「聯集」（邊邊有嘅都要有），刪咗嘅（tombstone）唔准翻生
+function mergeRemoteIntoLocal(b){
+  if (!b) return;
+  if (Array.isArray(b.roster) && b.roster.length){
+    const before = formState.roster.length;
+    formState.roster = [...new Set(formState.roster.concat(b.roster.filter(x => typeof x === 'string' && x.trim())))];
+    if (formState.roster.length !== before){ renderRoster(); saveForm(); }
+  }
+  if (Array.isArray(b.history) && b.history.length){
+    mergeTomb(b.tomb);
+    const tomb = loadTomb();
+    const list = loadHist();
+    let changed = false;
+    for (const r of b.history){
+      if (!r || !r.result || !r.raw || tomb.includes(r.id)) continue;
+      const i = list.findIndex(x => x.raw === r.raw);
+      if (i >= 0){
+        const same = list[i].id === r.id && JSON.stringify(list[i].paid || {}) === JSON.stringify(r.paid || {});
+        if (!same && (r.id || 0) >= (list[i].id || 0)){ list[i] = r; changed = true; }
+      }
+      else { list.push(r); changed = true; }
+    }
+    if (changed){
+      list.sort((a, b2) => (b2.id || 0) - (a.id || 0));
+      saveHistList(list); renderHist();
+    }
   }
 }
 const SYNC_T_KEY = 'badmintonCounterSyncTs';
@@ -1509,14 +1587,20 @@ async function doSync(manual){
     note('☁️ 已攞咗雲端資料落嚟（' + new Date().toLocaleTimeString() + '）');
     return;
   }
-  if (remote && remoteMs > (t.pushedAt || 0) && (!isDirty(t) || remoteMs > t.dirtyAt)){
+  // 🔁 聯集：雲端有嘅記錄／名單，本地都要有 —— 推之前一定先合併，
+  // 咁任何一部機（就算本地係舊版／得幾條）都冇得覆蓋走其他人嘅記錄
+  if (remoteHasData){
+    try{ mergeRemoteIntoLocal(rd); }catch(err){ /* 合併唔到就由佢，下次再試 */ }
+  }
+  const t2 = syncTs(); // 頭先個合併可能令本地變咗 dirty
+  if (remote && remoteMs > (t2.pushedAt || 0) && (!isDirty(t2) || remoteMs > t2.dirtyAt)){
     // 另一部機有較新嘅版本 → 攞佢過嚟
     try{ applyBundle(remote.data); }catch(err){ note('❌ 套用失敗：' + err.message); return; }
     setSyncTs({ pushedAt: Date.now(), dirtyAt: Date.now() });
     note('☁️ 已攞咗另一部機嘅最新資料（' + new Date().toLocaleTimeString() + '）');
     return;
   }
-  if (isDirty(t) || !remote){
+  if (isDirty(t2) || !remote){
     const now = new Date().toISOString();
     try{
       await sbFetch('/rest/v1/bm_state?on_conflict=code', {
@@ -1602,6 +1686,7 @@ $('histTable').addEventListener('click', ev => {
   if (ev.target.classList && ev.target.classList.contains('mrgChk')) return; // 揀合併嗰下唔好載入記錄
   const del = ev.target.closest('.delBtn');
   if (del){
+    addTombIds([+del.dataset.id]);
     saveHistList(loadHist().filter(r => r.id !== +del.dataset.id));
     renderHist();
     return;
@@ -1690,6 +1775,7 @@ $('importFile').addEventListener('change', ev => {
 });
 $('btnClearHist').addEventListener('click', () => {
   if (confirm('真係要清空晒所有記錄？（建議先匯出備份）')){
+    addTombIds(loadHist().map(r => r.id));
     saveHistList([]); renderHist();
   }
 });
